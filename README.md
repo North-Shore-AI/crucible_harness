@@ -241,7 +241,7 @@ This is part of the Spectra AI research infrastructure. Contributions welcome!
 
 ## License
 
-Copyright (c) 2024
+MIT License - see [LICENSE](https://github.com/North-Shore-AI/crucible_harness/blob/main/LICENSE) file for details
 
 ## Acknowledgments
 

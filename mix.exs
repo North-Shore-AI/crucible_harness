@@ -46,7 +46,7 @@ defmodule CrucibleHarness.MixProject do
     [
       name: "crucible_harness",
       description: description(),
-      files: ~w(lib mix.exs README.md LICENSE),
+      files: ~w(lib mix.exs README.md CHANGELOG.md LICENSE),
       licenses: ["MIT"],
       links: %{
         "GitHub" => @source_url,
@@ -64,6 +64,8 @@ defmodule CrucibleHarness.MixProject do
       source_url: @source_url,
       homepage_url: @source_url,
       extras: ["README.md", "CHANGELOG.md"],
+      assets: %{"assets" => "assets"},
+      logo: "assets/crucible_harness.svg",
       before_closing_head_tag: &mermaid_config/1
     ]
   end
