@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/crucible_harness.svg" alt="Harness" width="150"/>
+</p>
+
 # CrucibleHarness
 
 **Automated Experiment Orchestration for AI Research**
