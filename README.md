@@ -4,6 +4,11 @@
 
 # CrucibleHarness
 
+[![Elixir](https://img.shields.io/badge/elixir-1.14+-purple.svg)](https://elixir-lang.org)
+[![Hex.pm](https://img.shields.io/hexpm/v/crucible_harness.svg)](https://hex.pm/packages/crucible_harness)
+[![Documentation](https://img.shields.io/badge/docs-hexdocs-purple.svg)](https://hexdocs.pm/crucible_harness)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/North-Shore-AI/crucible_harness/blob/main/LICENSE)
+
 **Automated Experiment Orchestration for AI Research**
 
 ResearchHarness is a comprehensive Elixir library for orchestrating, executing, and analyzing large-scale AI research experiments. It provides the infrastructure to systematically run experiments across multiple conditions, datasets, and configurations while maintaining reproducibility, fault tolerance, and detailed statistical analysis.
