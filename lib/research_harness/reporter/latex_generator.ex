@@ -153,10 +153,10 @@ defmodule CrucibleHarness.Reporter.LaTeXGenerator do
       sig = if stats.significant, do: "Yes", else: "No"
 
       "#{escape_latex(c1)} vs #{escape_latex(c2)} & " <>
-        "$#{Float.round(stats.t_statistic, 3)}$ & " <>
-        "$#{Float.round(stats.p_value, 4)}$ & " <>
+        "$#{format_number_latex(stats.t_statistic, 3)}$ & " <>
+        "$#{format_number_latex(stats.p_value, 4)}$ & " <>
         "#{sig} & " <>
-        "$#{Float.round(stats.effect_size, 3)}$ \\\\"
+        "$#{format_number_latex(stats.effect_size, 3)}$ \\\\"
     end)
     |> Enum.join("\n")
   end
@@ -166,6 +166,11 @@ defmodule CrucibleHarness.Reporter.LaTeXGenerator do
     \\end{document}
     """
   end
+
+  defp format_number_latex(:infinity, _precision), do: "\\infty"
+  defp format_number_latex(n, precision) when is_float(n), do: Float.round(n, precision)
+  defp format_number_latex(n, _precision) when is_integer(n), do: n
+  defp format_number_latex(n, _precision), do: to_string(n)
 
   defp escape_latex(text) do
     text

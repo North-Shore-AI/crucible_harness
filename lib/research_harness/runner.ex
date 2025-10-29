@@ -100,23 +100,17 @@ defmodule CrucibleHarness.Runner do
     max_parallel = config.config[:max_parallel] || 10
     _checkpoint_interval = config.config[:checkpoint_interval] || 100
 
-    tasks
-    |> Flow.from_enumerable(max_demand: max_parallel, stages: max_parallel)
-    |> Flow.map(&execute_task/1)
-    |> Flow.partition()
-    |> Flow.on_trigger(fn batch, _partition, _trigger ->
-      # Update progress
-      ProgressTracker.update(length(batch))
+    # Execute tasks in parallel using Flow
+    results =
+      tasks
+      |> Flow.from_enumerable(max_demand: max_parallel, stages: max_parallel)
+      |> Flow.map(&execute_task/1)
+      |> Enum.to_list()
 
-      # Checkpoint if needed
-      # TODO: Implement CheckpointManager
-      # if rem(length(batch), checkpoint_interval) == 0 do
-      #   CheckpointManager.checkpoint(config.experiment_id, batch)
-      # end
+    # Update progress tracker with total count
+    ProgressTracker.update(length(results))
 
-      {batch, nil}
-    end)
-    |> Enum.to_list()
+    results
   end
 
   defp execute_task(task) do

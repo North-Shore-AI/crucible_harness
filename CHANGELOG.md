@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.1] - 2025-10-29
+
+### Fixed
+- Fixed Flow pipeline configuration in Runner for proper parallel execution
+- Fixed arithmetic errors in statistical analyzer when variance is zero
+- Fixed reporter formatters to handle infinity values gracefully
+- Removed unused variable warnings in example files
+
+### Added
+- Comprehensive test suite with 13 tests covering all major modules
+- Integration tests for full experiment workflow
+- Runnable example scripts: `run_simple_comparison.exs` and `run_ensemble_comparison.exs`
+- Helper functions for safe number formatting in all report generators
+
+### Improved
+- Statistical analyzer now handles edge cases (zero variance, equal means)
+- Better error handling throughout the codebase
+- Enhanced test coverage for Runner, Collector, Reporter, and utilities
+
 ## [0.1.0] - 2025-10-07
 
 ### Added

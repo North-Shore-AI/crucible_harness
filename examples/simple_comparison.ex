@@ -48,7 +48,7 @@ defmodule Examples.SimpleComparison do
 
   # Condition implementations
 
-  def baseline(query) do
+  def baseline(_query) do
     # Simulate a baseline condition with some variance
     latency = 100 + :rand.uniform(50)
     accuracy = 0.70 + :rand.uniform() * 0.1
@@ -61,7 +61,7 @@ defmodule Examples.SimpleComparison do
     }
   end
 
-  def treatment(query) do
+  def treatment(_query) do
     # Simulate a treatment condition with improved performance
     latency = 120 + :rand.uniform(60)
     accuracy = 0.80 + :rand.uniform() * 0.1

@@ -165,14 +165,19 @@ defmodule CrucibleHarness.Reporter.MarkdownGenerator do
       Enum.map(metrics, fn {metric, stats} ->
         sig = if stats.significant, do: "**Yes**", else: "No"
 
-        "| #{metric} | #{Float.round(stats.mean_diff, 4)} | " <>
-          "#{Float.round(stats.t_statistic, 4)} | #{Float.round(stats.p_value, 4)} | " <>
-          "#{sig} | #{Float.round(stats.effect_size, 4)} |"
+        "| #{metric} | #{format_number(stats.mean_diff)} | " <>
+          "#{format_number(stats.t_statistic)} | #{format_number(stats.p_value)} | " <>
+          "#{sig} | #{format_number(stats.effect_size)} |"
       end)
 
     [header, separator | rows]
     |> Enum.join("\n")
   end
+
+  defp format_number(:infinity), do: "∞"
+  defp format_number(n) when is_float(n), do: Float.round(n, 4)
+  defp format_number(n) when is_integer(n), do: n
+  defp format_number(n), do: to_string(n)
 
   defp format_confidence_intervals(intervals) do
     Enum.map(intervals, fn interval ->

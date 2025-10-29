@@ -87,7 +87,7 @@ defmodule Examples.EnsembleComparison do
 
   # Condition implementations
 
-  def single_model_a(query) do
+  def single_model_a(_query) do
     # Simulate a single model with moderate performance
     Process.sleep(80 + :rand.uniform(40))
 
@@ -102,7 +102,7 @@ defmodule Examples.EnsembleComparison do
     }
   end
 
-  def single_model_b(query) do
+  def single_model_b(_query) do
     # Simulate another single model with different characteristics
     Process.sleep(100 + :rand.uniform(50))
 
@@ -117,7 +117,7 @@ defmodule Examples.EnsembleComparison do
     }
   end
 
-  def ensemble_3(query) do
+  def ensemble_3(_query) do
     # Simulate a 3-model ensemble
     Process.sleep(200 + :rand.uniform(100))
 
@@ -133,7 +133,7 @@ defmodule Examples.EnsembleComparison do
     }
   end
 
-  def ensemble_5(query) do
+  def ensemble_5(_query) do
     # Simulate a 5-model ensemble
     Process.sleep(300 + :rand.uniform(150))
 

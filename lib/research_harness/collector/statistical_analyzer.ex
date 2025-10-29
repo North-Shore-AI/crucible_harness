@@ -35,11 +35,12 @@ defmodule CrucibleHarness.Collector.StatisticalAnalyzer do
            %{
              condition1: c1,
              condition2: c2,
-             mean_diff: mean(values1) - mean(values2),
+             mean_diff: test_result.mean_diff,
              t_statistic: test_result.t_statistic,
              p_value: test_result.p_value,
-             significant: test_result.p_value < config.statistical_analysis.significance_level,
-             confidence_interval: test_result.confidence_interval,
+             significant: test_result.significant,
+             ci_lower: test_result.ci_lower,
+             ci_upper: test_result.ci_upper,
              effect_size: cohens_d(values1, values2)
            }}
         end)
@@ -92,29 +93,61 @@ defmodule CrucibleHarness.Collector.StatisticalAnalyzer do
     var1 = variance(values1)
     var2 = variance(values2)
 
-    # Welch's t-test (unequal variances)
-    pooled_std = :math.sqrt(var1 / n1 + var2 / n2)
-    t_statistic = (mean1 - mean2) / pooled_std
+    # Handle case where variance is zero (all values are the same)
+    if var1 == 0 and var2 == 0 do
+      # If both variances are zero, there's no variation to test
+      %{
+        t_statistic: if(mean1 == mean2, do: 0.0, else: :infinity),
+        p_value: if(mean1 == mean2, do: 1.0, else: 0.0),
+        df: n1 + n2 - 2,
+        mean_diff: mean1 - mean2,
+        ci_lower: mean1 - mean2,
+        ci_upper: mean1 - mean2,
+        significant: mean1 != mean2
+      }
+    else
+      # Welch's t-test (unequal variances)
+      pooled_std = :math.sqrt(var1 / n1 + var2 / n2)
 
-    # Degrees of freedom (Welch-Satterthwaite)
-    df =
-      :math.pow(var1 / n1 + var2 / n2, 2) /
-        (:math.pow(var1 / n1, 2) / (n1 - 1) + :math.pow(var2 / n2, 2) / (n2 - 1))
+      t_statistic =
+        if pooled_std > 0 do
+          (mean1 - mean2) / pooled_std
+        else
+          if mean1 == mean2, do: 0.0, else: :infinity
+        end
 
-    # Approximate p-value using t-distribution
-    p_value = 2 * (1 - t_cdf(abs(t_statistic), df))
+      # Degrees of freedom (Welch-Satterthwaite)
+      df =
+        if var1 > 0 or var2 > 0 do
+          :math.pow(var1 / n1 + var2 / n2, 2) /
+            (:math.pow(var1 / n1, 2) / (n1 - 1) + :math.pow(var2 / n2, 2) / (n2 - 1))
+        else
+          n1 + n2 - 2
+        end
 
-    # Confidence interval
-    ci_level = analysis_config.confidence_interval
-    t_critical = t_inverse(1 - (1 - ci_level) / 2, df)
-    margin = t_critical * pooled_std
+      # Approximate p-value using t-distribution
+      p_value =
+        if is_number(t_statistic) and t_statistic != :infinity do
+          2 * (1 - t_cdf(abs(t_statistic), df))
+        else
+          if mean1 == mean2, do: 1.0, else: 0.0
+        end
 
-    %{
-      t_statistic: t_statistic,
-      p_value: p_value,
-      degrees_of_freedom: df,
-      confidence_interval: {mean1 - mean2 - margin, mean1 - mean2 + margin}
-    }
+      # Confidence interval
+      ci_level = analysis_config.confidence_interval
+      t_critical = t_inverse(1 - (1 - ci_level) / 2, df)
+      margin = t_critical * pooled_std
+
+      %{
+        t_statistic: t_statistic,
+        p_value: p_value,
+        degrees_of_freedom: df,
+        mean_diff: mean1 - mean2,
+        ci_lower: mean1 - mean2 - margin,
+        ci_upper: mean1 - mean2 + margin,
+        significant: p_value < analysis_config.significance_level
+      }
+    end
   end
 
   defp cohens_d(values1, values2) do
@@ -128,9 +161,15 @@ defmodule CrucibleHarness.Collector.StatisticalAnalyzer do
     var2 = variance(values2)
 
     # Pooled standard deviation
-    pooled_std = :math.sqrt(((n1 - 1) * var1 + (n2 - 1) * var2) / (n1 + n2 - 2))
+    pooled_var = ((n1 - 1) * var1 + (n2 - 1) * var2) / (n1 + n2 - 2)
 
-    (mean1 - mean2) / pooled_std
+    if pooled_var > 0 do
+      pooled_std = :math.sqrt(pooled_var)
+      (mean1 - mean2) / pooled_std
+    else
+      # If variance is zero, return 0 if means are equal, infinity otherwise
+      if mean1 == mean2, do: 0.0, else: :infinity
+    end
   end
 
   defp compute_cohens_d_baseline(_values) do

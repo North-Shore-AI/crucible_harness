@@ -109,4 +109,128 @@ defmodule ResearchHarnessTest do
       assert %DateTime{} = estimate.estimated_completion
     end
   end
+
+  describe "runner" do
+    test "runs a simple experiment" do
+      config = SimpleExperiment.__config__()
+      {:ok, results} = CrucibleHarness.Runner.run_experiment(config)
+
+      assert is_list(results)
+      assert length(results) > 0
+
+      # Check first result has expected structure
+      first = List.first(results)
+      assert is_map(first)
+      assert Map.has_key?(first, :experiment_id)
+      assert Map.has_key?(first, :condition)
+      assert Map.has_key?(first, :result)
+    end
+
+    test "respects repeat count" do
+      config = SimpleExperiment.__config__()
+      {:ok, results} = CrucibleHarness.Runner.run_experiment(config)
+
+      # Should have results for each condition * repeat * dataset_size
+      # 2 conditions * 2 repeats * 100 samples (default) = 400
+      assert length(results) == 400
+    end
+  end
+
+  describe "metrics aggregator" do
+    test "aggregates results correctly" do
+      config = SimpleExperiment.__config__()
+      {:ok, results} = CrucibleHarness.Runner.run_experiment(config)
+
+      aggregated = CrucibleHarness.Collector.MetricsAggregator.aggregate(results, config)
+
+      assert is_list(aggregated)
+      # 2 conditions
+      assert length(aggregated) == 2
+
+      # Each aggregation should have statistics
+      Enum.each(aggregated, fn agg ->
+        assert Map.has_key?(agg, :condition)
+        assert Map.has_key?(agg, :n)
+        assert Map.has_key?(agg, :metrics)
+      end)
+    end
+  end
+
+  describe "statistical analyzer" do
+    test "performs statistical analysis" do
+      config = SimpleExperiment.__config__()
+      {:ok, results} = CrucibleHarness.Runner.run_experiment(config)
+      aggregated = CrucibleHarness.Collector.MetricsAggregator.aggregate(results, config)
+
+      analysis = CrucibleHarness.Collector.StatisticalAnalyzer.analyze(aggregated, config)
+
+      assert is_map(analysis)
+      assert Map.has_key?(analysis, :comparisons)
+      assert Map.has_key?(analysis, :effect_sizes)
+      assert Map.has_key?(analysis, :confidence_intervals)
+    end
+  end
+
+  describe "reporter" do
+    test "generates markdown report" do
+      config = SimpleExperiment.__config__()
+      {:ok, results} = CrucibleHarness.Runner.run_experiment(config)
+      aggregated = CrucibleHarness.Collector.MetricsAggregator.aggregate(results, config)
+      analysis = CrucibleHarness.Collector.StatisticalAnalyzer.analyze(aggregated, config)
+
+      report_data = %{
+        aggregated_results: aggregated,
+        statistical_analysis: analysis,
+        comparison_matrices: %{}
+      }
+
+      markdown = CrucibleHarness.Reporter.MarkdownGenerator.generate(config, report_data)
+
+      assert is_binary(markdown)
+      assert String.contains?(markdown, config.name)
+      assert String.contains?(markdown, "## Results")
+      assert String.contains?(markdown, "## Statistical Analysis")
+    end
+
+    test "generates HTML report" do
+      config = SimpleExperiment.__config__()
+      {:ok, results} = CrucibleHarness.Runner.run_experiment(config)
+      aggregated = CrucibleHarness.Collector.MetricsAggregator.aggregate(results, config)
+      analysis = CrucibleHarness.Collector.StatisticalAnalyzer.analyze(aggregated, config)
+
+      report_data = %{
+        aggregated_results: aggregated,
+        statistical_analysis: analysis,
+        comparison_matrices: %{}
+      }
+
+      html = CrucibleHarness.Reporter.HTMLGenerator.generate(config, report_data)
+
+      assert is_binary(html)
+      assert String.contains?(html, "<!DOCTYPE html>")
+      assert String.contains?(html, config.name)
+    end
+  end
+
+  describe "full integration" do
+    @tag timeout: 120_000
+    test "runs complete experiment with report generation" do
+      result =
+        CrucibleHarness.run(SimpleExperiment,
+          output_dir: "./test_output",
+          formats: [:markdown],
+          confirm: false
+        )
+
+      assert {:ok, report} = result
+      assert is_map(report)
+      assert Map.has_key?(report, :experiment_id)
+      assert Map.has_key?(report, :results)
+      assert Map.has_key?(report, :analysis)
+      assert Map.has_key?(report, :reports)
+
+      # Clean up
+      File.rm_rf!("./test_output")
+    end
+  end
 end

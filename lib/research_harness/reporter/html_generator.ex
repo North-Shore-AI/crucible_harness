@@ -275,14 +275,19 @@ defmodule CrucibleHarness.Reporter.HTMLGenerator do
       """
       <tr>
         <td><strong>#{metric}</strong></td>
-        <td>#{Float.round(stats.mean_diff, 4)}</td>
-        <td>#{Float.round(stats.t_statistic, 4)}</td>
-        <td>#{Float.round(stats.p_value, 4)}</td>
+        <td>#{format_number(stats.mean_diff)}</td>
+        <td>#{format_number(stats.t_statistic)}</td>
+        <td>#{format_number(stats.p_value)}</td>
         <td class="#{sig_class}">#{sig_text}</td>
-        <td>#{Float.round(stats.effect_size, 4)}</td>
+        <td>#{format_number(stats.effect_size)}</td>
       </tr>
       """
     end)
     |> Enum.join("\n")
   end
+
+  defp format_number(:infinity), do: "∞"
+  defp format_number(n) when is_float(n), do: Float.round(n, 4)
+  defp format_number(n) when is_integer(n), do: n
+  defp format_number(n), do: to_string(n)
 end
