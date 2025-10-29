@@ -1,6 +1,6 @@
 defmodule ResearchHarnessTest do
   use ExUnit.Case
-  doctest CrucibleHarness
+  # doctest CrucibleHarness - Disabled: examples prompt for user input which hangs tests
 
   alias CrucibleHarness.Experiment
 
@@ -22,7 +22,7 @@ defmodule ResearchHarnessTest do
 
     config(%{
       timeout: 5_000,
-      rate_limit: 10
+      rate_limit: 400
     })
 
     def condition_a(_query) do
