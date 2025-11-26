@@ -24,6 +24,9 @@ Think of it as **"pytest + MLflow + Weights & Biases"** for Elixir AI research.
 - **Multi-Format Reporting** - Generate Markdown, LaTeX, HTML, and Jupyter notebooks
 - **Cost Management** - Estimate and control API costs before execution
 - **Reproducibility** - Version control for experiments, controlled random seeds, full audit trails
+- **Lifecycle Hooks** (v0.2.0) - Extensible callbacks for setup, teardown, and custom error handling
+- **Error Recovery** (v0.2.0) - Automatic retry with exponential backoff and circuit breaker
+- **Metric Validation** (v0.2.0) - Runtime schema validation with type coercion
 
 ## Quick Start
 
@@ -87,6 +90,166 @@ Reports are automatically generated in your specified formats:
 
 ## Advanced Features
 
+### Lifecycle Hooks (v0.2.0)
+
+Hooks provide extension points during experiment execution for setup, teardown, logging, and custom error handling:
+
+```elixir
+defmodule MyExperiment do
+  use CrucibleHarness.Experiment
+
+  name "Experiment with Hooks"
+  dataset :my_dataset
+  conditions [%{name: "test", fn: &test_condition/1}]
+  metrics [:accuracy, :latency]
+
+  # Called once before experiment starts - can modify config
+  before_experiment fn config ->
+    Logger.info("Starting experiment: #{config.name}")
+    {:ok, Map.put(config, :start_time, DateTime.utc_now())}
+  end
+
+  # Called once after experiment completes
+  after_experiment fn config, results ->
+    duration = DateTime.diff(DateTime.utc_now(), config.start_time, :second)
+    Logger.info("Completed in #{duration}s with #{length(results)} results")
+    :ok
+  end
+
+  # Called before each condition execution
+  before_condition fn condition, query ->
+    Logger.metadata(condition: condition.name, query_id: query.id)
+    :ok
+  end
+
+  # Called after each condition execution
+  after_condition fn condition, query, result ->
+    :telemetry.execute([:experiment, :task, :complete], %{latency: result.latency}, %{})
+    :ok
+  end
+
+  # Called when a condition fails - return :retry, :skip, or :abort
+  on_error fn condition, query, error ->
+    case error do
+      {:error, :timeout} -> :retry
+      {:error, :rate_limited} -> :retry
+      {:error, :authentication_failed} -> :abort
+      _ -> :skip
+    end
+  end
+
+  def test_condition(query), do: %{accuracy: 0.85, latency: 100}
+end
+```
+
+**Hook Signatures:**
+- `before_experiment(config)` → `{:ok, config}` or `:ok`
+- `after_experiment(config, results)` → `:ok`
+- `before_condition(condition, query)` → `:ok`
+- `after_condition(condition, query, result)` → `:ok`
+- `on_error(condition, query, error)` → `:retry` | `:skip` | `:abort`
+
+All hooks are optional and errors in hooks are handled gracefully (they won't crash your experiment).
+
+### Error Recovery (v0.2.0)
+
+Configure automatic retry with exponential backoff for transient failures:
+
+```elixir
+config %{
+  error_handling: %{
+    # Retry strategy: :exponential_backoff, :constant, or :linear
+    retry_strategy: :exponential_backoff,
+    max_retries: 3,
+    initial_delay_ms: 1000,
+    max_delay_ms: 30_000,
+    backoff_factor: 2.0,
+    jitter: true,  # Add randomness to prevent thundering herd
+
+    # Dead letter queue for permanently failed tasks
+    dlq_enabled: true,
+    dlq_path: "./failed_tasks.jsonl",
+
+    # Circuit breaker - abort if failure rate exceeds threshold
+    max_failure_rate: 0.1,  # Abort if >10% tasks fail
+    failure_window: 100     # Over last 100 tasks
+  }
+}
+```
+
+**Error Classification:**
+- **Retryable errors:** `:timeout`, `:connection_refused`, `:rate_limited`, HTTP 429/502/503/504
+- **Permanent errors:** `:invalid_query`, `:authentication_failed`, HTTP 400/401/403/404
+
+Task results now include retry information:
+
+```elixir
+%{
+  result: {:ok, %{accuracy: 0.85}},
+  attempts: 2,
+  retry_delays: [1000, 2000],
+  final_status: :success,  # :success | :failed_permanent | :failed_retries_exhausted
+  error_history: [%{attempt: 1, error: :timeout, timestamp: ~U[...]}]
+}
+```
+
+### Metric Validation (v0.2.0)
+
+Define schemas to validate metrics at runtime and catch errors early:
+
+```elixir
+defmodule MyExperiment do
+  use CrucibleHarness.Experiment
+
+  name "Validated Experiment"
+  dataset :my_dataset
+  conditions [%{name: "test", fn: &test_condition/1}]
+
+  metrics [:accuracy, :latency, :cost]
+
+  # Define validation schemas for each metric
+  metric_schemas %{
+    accuracy: %{type: :float, min: 0.0, max: 1.0, required: true},
+    latency: %{type: :number, min: 0, unit: :milliseconds, required: true},
+    cost: %{type: :float, min: 0.0, required: false, default: 0.0},
+    custom: %{
+      type: :map,
+      schema: %{
+        value: %{type: :number, min: 0},
+        confidence: %{type: :float, min: 0.0, max: 1.0}
+      }
+    }
+  }
+
+  config %{
+    metric_validation: %{
+      enabled: true,
+      on_invalid: :log_and_continue,  # :log_and_continue | :log_and_retry | :abort
+      coerce_types: true  # Try to convert "0.85" -> 0.85
+    }
+  }
+
+  def test_condition(query) do
+    %{accuracy: 0.85, latency: 123, custom: %{value: 42, confidence: 0.95}}
+  end
+end
+```
+
+**Schema Helpers:**
+
+```elixir
+alias CrucibleHarness.Validation.Schema
+
+# Common schema types
+Schema.float(min: 0.0, max: 1.0)      # Float with range
+Schema.number(min: 0)                  # Integer or float
+Schema.map(schema: %{...})             # Nested map validation
+Schema.percentage()                    # 0-100 float
+Schema.probability()                   # 0-1 float
+Schema.positive_number()               # >= 0
+Schema.duration_ms()                   # Positive number in milliseconds
+```
+
 ### Parameter Sweeps
 
 ```elixir
@@ -141,11 +304,20 @@ statistical_analysis %{
 ## Architecture
 
 ```
-ResearchHarness
+CrucibleHarness
 ├── Experiment (DSL & Definition)
 ├── Runner (Execution Engine with GenStage/Flow)
 ├── Collector (Results Aggregation & Statistical Analysis)
 ├── Reporter (Multi-Format Output Generation)
+├── Hooks (Lifecycle Hook Execution) [v0.2.0]
+│   └── Executor (Safe hook execution with error handling)
+├── Errors (Error Recovery Framework) [v0.2.0]
+│   ├── Classifier (Error type classification)
+│   ├── Retry (Exponential backoff logic)
+│   └── DLQ (Dead letter queue for failed tasks)
+├── Validation (Metric Validation) [v0.2.0]
+│   ├── Schema (Schema definition helpers)
+│   └── MetricValidator (Runtime validation)
 └── Utilities (Cost/Time Estimation, Checkpointing)
 ```
 
@@ -193,6 +365,12 @@ Resumes a failed or interrupted experiment from checkpoint.
 - `cost_budget` - Budget constraints
 - `statistical_analysis` - Analysis parameters
 - `custom_metrics` - Custom metric definitions
+- `metric_schemas` - Validation schemas for metrics (v0.2.0)
+- `before_experiment` - Hook called before experiment starts (v0.2.0)
+- `after_experiment` - Hook called after experiment completes (v0.2.0)
+- `before_condition` - Hook called before each condition (v0.2.0)
+- `after_condition` - Hook called after each condition (v0.2.0)
+- `on_error` - Hook for custom error handling (v0.2.0)
 
 ## Configuration
 
@@ -217,7 +395,7 @@ Add `research_harness` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:crucible_harness, "~> 0.1.0"}
+    {:crucible_harness, "~> 0.2.0"}
   ]
 end
 ```

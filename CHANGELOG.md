@@ -2,6 +2,57 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] - 2025-11-25
+
+### Added
+- **Lifecycle Hooks System:** Added comprehensive hook support for experiment lifecycle management
+  - `before_experiment/1` - Setup operations before experiment starts
+  - `after_experiment/1` - Teardown operations after experiment completes
+  - `before_condition/1` - Pre-processing before each condition execution
+  - `after_condition/1` - Post-processing after each condition execution
+  - `on_error/1` - Custom error handling with :retry, :skip, :abort actions
+  - New `CrucibleHarness.Hooks.Executor` module for safe hook execution with error handling
+
+- **Error Recovery Framework (Partial):** Foundation for robust error handling
+  - Test suite for retry logic with exponential backoff
+  - Test suite for error classification (transient vs permanent)
+  - Test suite for dead letter queue (DLQ) for failed tasks
+  - Test suite for circuit breaker pattern
+  - *Implementation of error recovery modules in progress*
+
+- **Metric Validation System (Partial):** Runtime validation of experiment results
+  - Test suite for metric schema validation
+  - Test suite for type coercion and range checking
+  - Test suite for nested schema validation
+  - *Implementation of validation modules in progress*
+
+- **Comprehensive Design Document:** Added `docs/20251125/enhancement_design.md`
+  - Detailed analysis of 8 major enhancement areas
+  - Implementation roadmap with 4 phases
+  - API specifications and examples
+  - Testing strategy and performance considerations
+
+### Changed
+- Updated `CrucibleHarness.Experiment` module to support hook macros
+- Extended experiment configuration to include hooks and metric schemas
+- Version bump to 0.2.0 reflecting significant new capabilities
+
+### Documentation
+- Added detailed design document in `docs/20251125/`
+- Updated README.md with version 0.2.0
+- Test files documenting expected behavior for new features
+
+### Testing
+- Added 3 new comprehensive test files (90+ tests):
+  - `test/research_harness/hooks_test.exs` - Lifecycle hooks testing
+  - `test/research_harness/errors_test.exs` - Error recovery testing
+  - `test/research_harness/validation_test.exs` - Metric validation testing
+
+### Notes
+- **Status:** Core infrastructure for Phase 1 enhancements is in place
+- **Next Steps:** Complete implementation of error recovery and metric validation modules
+- **Backward Compatibility:** All changes are 100% backward compatible - hooks are optional
+
 ## [0.1.1] - 2025-10-29
 
 ### Fixed

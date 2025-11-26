@@ -192,13 +192,14 @@ defmodule CrucibleHarness do
   defp format_duration(ms) when ms < 60_000, do: "#{Float.round(ms / 1000, 1)}s"
 
   defp format_duration(ms) when ms < 3_600_000 do
-    minutes = div(ms, 60_000)
+    minutes = ms |> trunc() |> div(60_000)
     "#{minutes}m"
   end
 
   defp format_duration(ms) do
-    hours = div(ms, 3_600_000)
-    minutes = div(rem(ms, 3_600_000), 60_000)
+    ms_int = trunc(ms)
+    hours = div(ms_int, 3_600_000)
+    minutes = div(rem(ms_int, 3_600_000), 60_000)
     "#{hours}h #{minutes}m"
   end
 

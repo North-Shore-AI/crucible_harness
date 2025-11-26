@@ -1,7 +1,7 @@
 defmodule CrucibleHarness.MixProject do
   use Mix.Project
 
-  @version "0.1.1"
+  @version "0.2.0"
   @source_url "https://github.com/North-Shore-AI/crucible_harness"
 
   def project do
@@ -34,7 +34,8 @@ defmodule CrucibleHarness.MixProject do
       {:nimble_csv, "~> 1.2"},
       {:statistex, "~> 1.0"},
       {:telemetry, "~> 1.2"},
-      {:ex_doc, "~> 0.31", only: :dev, runtime: false}
+      {:ex_doc, "~> 0.31", only: :dev, runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev], runtime: false}
     ]
   end
 

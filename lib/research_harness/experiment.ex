@@ -58,6 +58,12 @@ defmodule CrucibleHarness.Experiment do
       Module.register_attribute(__MODULE__, :cost_budget, persist: true)
       Module.register_attribute(__MODULE__, :statistical_analysis, persist: true)
       Module.register_attribute(__MODULE__, :custom_metrics, persist: true)
+      Module.register_attribute(__MODULE__, :metric_schemas, persist: true)
+      Module.register_attribute(__MODULE__, :before_experiment_hook, persist: true)
+      Module.register_attribute(__MODULE__, :after_experiment_hook, persist: true)
+      Module.register_attribute(__MODULE__, :before_condition_hook, persist: true)
+      Module.register_attribute(__MODULE__, :after_condition_hook, persist: true)
+      Module.register_attribute(__MODULE__, :on_error_hook, persist: true)
 
       @before_compile CrucibleHarness.Experiment
     end
@@ -83,7 +89,9 @@ defmodule CrucibleHarness.Experiment do
           dataset_config: @dataset_config || %{},
           cost_budget: @cost_budget,
           statistical_analysis: @statistical_analysis || default_statistical_analysis(),
-          custom_metrics: @custom_metrics || []
+          custom_metrics: @custom_metrics || [],
+          metric_schemas: @metric_schemas || %{},
+          hooks: CrucibleHarness.Experiment.collect_hooks(__MODULE__)
         }
       end
 
@@ -100,6 +108,24 @@ defmodule CrucibleHarness.Experiment do
           confidence_interval: 0.95
         }
       end
+    end
+  end
+
+  @doc false
+  def collect_hooks(module) do
+    %{
+      before_experiment: get_attr(module, :before_experiment_hook),
+      after_experiment: get_attr(module, :after_experiment_hook),
+      before_condition: get_attr(module, :before_condition_hook),
+      after_condition: get_attr(module, :after_condition_hook),
+      on_error: get_attr(module, :on_error_hook)
+    }
+  end
+
+  defp get_attr(module, attr) do
+    case List.keyfind(module.__info__(:attributes), attr, 0) do
+      {^attr, [value | _]} -> value
+      _ -> nil
     end
   end
 
@@ -226,6 +252,71 @@ defmodule CrucibleHarness.Experiment do
   defmacro custom_metrics(metrics_list) do
     quote do
       @custom_metrics unquote(metrics_list)
+    end
+  end
+
+  @doc """
+  Defines metric validation schemas.
+  """
+  defmacro metric_schemas(schemas_map) do
+    quote do
+      @metric_schemas unquote(schemas_map)
+    end
+  end
+
+  @doc """
+  Defines a hook to run before the experiment starts.
+
+  The hook receives the config and should return `{:ok, config}` or `:ok`.
+  """
+  defmacro before_experiment(hook_fn) do
+    quote do
+      @before_experiment_hook unquote(hook_fn)
+    end
+  end
+
+  @doc """
+  Defines a hook to run after the experiment completes.
+
+  The hook receives the config and results and should return `:ok`.
+  """
+  defmacro after_experiment(hook_fn) do
+    quote do
+      @after_experiment_hook unquote(hook_fn)
+    end
+  end
+
+  @doc """
+  Defines a hook to run before each condition execution.
+
+  The hook receives the condition and query and should return `:ok`.
+  """
+  defmacro before_condition(hook_fn) do
+    quote do
+      @before_condition_hook unquote(hook_fn)
+    end
+  end
+
+  @doc """
+  Defines a hook to run after each condition execution.
+
+  The hook receives the condition, query, and result and should return `:ok`.
+  """
+  defmacro after_condition(hook_fn) do
+    quote do
+      @after_condition_hook unquote(hook_fn)
+    end
+  end
+
+  @doc """
+  Defines a hook to handle errors during condition execution.
+
+  The hook receives the condition, query, and error and should return
+  `:retry`, `:skip`, or `:abort`.
+  """
+  defmacro on_error(hook_fn) do
+    quote do
+      @on_error_hook unquote(hook_fn)
     end
   end
 end
