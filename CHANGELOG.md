@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - 2025-11-26
+
+### Changed
+- **Dependency Update:** Now depends on `crucible_ir` v0.1.1 for shared IR structs
+- **Framework Integration:** Updated to work with `crucible_framework` v0.5.0
+- **Module Namespace:** All IR imports updated from `Crucible.IR.*` to `CrucibleIR.*`
+
+### Migration Guide
+
+If you were using internal IR structs (uncommon in typical usage), update your imports:
+
+```elixir
+# Before (if you were using internal IR structs)
+alias Crucible.IR.{Experiment, BackendRef, StageDef}
+
+# After
+alias CrucibleIR.{Experiment, BackendRef, StageDef}
+```
+
+For most users, this change is transparent as the harness API remains unchanged.
+
+### Technical Details
+- Added `crucible_ir` as a direct dependency for IR struct definitions
+- Updated to `crucible_framework` v0.5.0 which now uses `crucible_ir` internally
+- No breaking changes to the public API - all DSL macros work identically
+
 ## [0.2.0] - 2025-11-25
 
 ### Added

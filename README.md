@@ -395,7 +395,7 @@ Add `research_harness` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:crucible_harness, "~> 0.2.0"}
+    {:crucible_harness, "~> 0.3.0"}
   ]
 end
 ```
@@ -409,6 +409,33 @@ def deps do
   ]
 end
 ```
+
+## Upgrading to v0.3.0
+
+Version 0.3.0 introduces integration with the new `crucible_ir` library for shared IR structs. This change is mostly transparent to users.
+
+### What Changed
+- CrucibleHarness now depends on `crucible_ir` v0.1.1 for IR struct definitions
+- Updated to work with `crucible_framework` v0.5.0
+- Internal IR module references updated from `Crucible.IR.*` to `CrucibleIR.*`
+
+### Do I Need to Change My Code?
+**For most users: No.** The public API remains unchanged. Your experiment definitions will work exactly as before.
+
+**Only if you were directly using internal IR structs** (uncommon), update your imports:
+
+```elixir
+# Before
+alias Crucible.IR.{Experiment, BackendRef, StageDef}
+
+# After
+alias CrucibleIR.{Experiment, BackendRef, StageDef}
+```
+
+### Dependencies
+The new version automatically brings in:
+- `crucible_ir` v0.1.1 - Shared IR structs
+- `crucible_framework` v0.5.0 - Updated framework integration
 
 ## Documentation
 
