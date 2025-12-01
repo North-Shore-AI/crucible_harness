@@ -1,6 +1,8 @@
 defmodule CrucibleHarness.HooksTest do
   use ExUnit.Case, async: true
 
+  import ExUnit.CaptureLog
+
   alias CrucibleHarness.Hooks.Executor
 
   describe "lifecycle hooks" do
@@ -133,7 +135,12 @@ defmodule CrucibleHarness.HooksTest do
       config = HookTestExperiment.__config__()
 
       # Should return error tuple, not crash
-      assert {:error, _reason} = Executor.run_before_experiment(failing_hook, config)
+      log =
+        capture_log(fn ->
+          assert {:error, _reason} = Executor.run_before_experiment(failing_hook, config)
+        end)
+
+      assert log =~ "before_experiment hook raised exception"
     end
 
     test "hooks with nil are skipped" do
