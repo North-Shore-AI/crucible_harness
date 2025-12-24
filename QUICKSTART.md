@@ -279,6 +279,36 @@ You now know enough to:
 
 Go forth and experiment! 🚀
 
+## Solver Pipelines (v0.3.1)
+
+Build composable LLM execution pipelines:
+
+```elixir
+alias CrucibleHarness.{TaskState}
+alias CrucibleHarness.Solver.{Chain, Generate}
+
+# Create state from sample
+sample = %{id: "test", input: "What is 2+2?"}
+state = TaskState.new(sample)
+
+# Build a chain with the Generate solver
+chain = Chain.new([
+  Generate.new(%{temperature: 0.7, max_tokens: 100})
+])
+
+# Define your LLM backend
+generate_fn = fn state, config ->
+  {:ok, %{content: "4", finish_reason: "stop", usage: %{}}}
+end
+
+# Execute
+{:ok, result} = Chain.solve(chain, state, generate_fn)
+IO.puts result.output.content  # "4"
+```
+
+See **USAGE.md** for full Solver Pipelines documentation.
+
 ---
 
 **Pro Tip**: Keep your experiments in version control alongside your code. This ensures reproducibility and makes it easy to track experimental changes over time.
+

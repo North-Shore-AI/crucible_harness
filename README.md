@@ -27,6 +27,9 @@ Think of it as **"pytest + MLflow + Weights & Biases"** for Elixir AI research.
 - **Lifecycle Hooks** (v0.2.0) - Extensible callbacks for setup, teardown, and custom error handling
 - **Error Recovery** (v0.2.0) - Automatic retry with exponential backoff and circuit breaker
 - **Metric Validation** (v0.2.0) - Runtime schema validation with type coercion
+- **Solver Pipelines** (v0.3.1) - Composable execution steps inspired by inspect-ai
+- **State Threading** (v0.3.1) - TaskState carries messages and metadata through solver chains
+- **LLM Backend Abstraction** (v0.3.1) - Swappable Generate backends for different LLM providers
 
 ## Quick Start
 
@@ -250,7 +253,75 @@ Schema.positive_number()               # >= 0
 Schema.duration_ms()                   # Positive number in milliseconds
 ```
 
+### Solver Pipelines (v0.3.1)
+
+Build composable LLM execution pipelines using inspect-ai-inspired patterns:
+
+```elixir
+alias CrucibleHarness.{Solver, TaskState}
+alias CrucibleHarness.Solver.{Chain, Generate}
+
+# Define a custom solver
+defmodule SystemPromptSolver do
+  use CrucibleHarness.Solver
+
+  @impl true
+  def solve(state, _generate_fn) do
+    msg = %{role: "system", content: "You are a helpful assistant."}
+    {:ok, TaskState.add_message(state, msg)}
+  end
+end
+
+# Create a solver chain
+chain = Chain.new([
+  SystemPromptSolver,
+  Generate.new(%{model: "gpt-4", temperature: 0.7, max_tokens: 500, stop: []}),
+])
+
+# Initialize state from a sample
+sample = %{id: "sample_1", input: "Explain recursion briefly."}
+state = TaskState.new(sample)
+
+# Define your LLM backend
+generate_fn = fn state, config ->
+  # Call your LLM (Tinkex, OpenAI, etc.)
+  MyLLMBackend.generate(state.messages, config)
+end
+
+# Execute the chain
+{:ok, result} = Chain.solve(chain, state, generate_fn)
+
+# Access results
+IO.puts(result.output.content)
+```
+
+**Key Concepts:**
+
+- **Solver** - A behaviour for execution steps (`solve/2` callback)
+- **Chain** - Composes solvers sequentially; stops on error or `state.completed`
+- **TaskState** - Carries messages, metadata, and inter-solver data via `store`
+- **Generate** - Behaviour for LLM backends; `Solver.Generate` is a built-in solver
+
+**Implementing a Generate Backend:**
+
+```elixir
+defmodule MyBackend do
+  @behaviour CrucibleHarness.Generate
+
+  @impl true
+  def generate(messages, config) do
+    # Call your LLM API
+    {:ok, %{
+      content: "Response text",
+      finish_reason: "stop",
+      usage: %{prompt_tokens: 10, completion_tokens: 20, total_tokens: 30}
+    }}
+  end
+end
+```
+
 ### Parameter Sweeps
+
 
 ```elixir
 defmodule EnsembleSizeSweep do
@@ -318,6 +389,11 @@ CrucibleHarness
 ├── Validation (Metric Validation) [v0.2.0]
 │   ├── Schema (Schema definition helpers)
 │   └── MetricValidator (Runtime validation)
+├── Solver (Composable Execution Steps) [v0.3.1]
+│   ├── Chain (Sequential solver composition)
+│   └── Generate (Built-in LLM generation solver)
+├── TaskState (State Threading for Pipelines) [v0.3.1]
+├── Generate (LLM Backend Abstraction) [v0.3.1]
 └── Utilities (Cost/Time Estimation, Checkpointing)
 ```
 
@@ -395,7 +471,7 @@ Add `research_harness` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:crucible_harness, "~> 0.3.0"}
+    {:crucible_harness, "~> 0.3.1"}
   ]
 end
 ```
@@ -410,17 +486,59 @@ def deps do
 end
 ```
 
-## Upgrading to v0.3.0
+## Upgrading
+
+### Upgrading to v0.3.1
+
+Version 0.3.1 adds inspect-ai parity modules for building composable LLM execution pipelines.
+
+#### New Modules
+- `CrucibleHarness.Solver` - Behaviour for composable execution steps
+- `CrucibleHarness.Solver.Chain` - Sequential solver composition with early termination
+- `CrucibleHarness.Solver.Generate` - Built-in solver for LLM generation
+- `CrucibleHarness.TaskState` - State object threaded through solver pipelines
+- `CrucibleHarness.Generate` - Behaviour for LLM backend implementations
+
+#### Quick Example
+
+```elixir
+alias CrucibleHarness.{Solver, TaskState}
+alias CrucibleHarness.Solver.{Chain, Generate}
+
+# Create a sample and initial state
+sample = %{id: "test_1", input: "What is 2+2?"}
+state = TaskState.new(sample)
+
+# Define a generate function (your LLM backend)
+generate_fn = fn state, config ->
+  {:ok, %{content: "4", finish_reason: "stop", usage: %{}}}
+end
+
+# Build a solver chain
+chain = Chain.new([
+  MySystemPromptSolver,
+  Generate.new(%{temperature: 0.7, max_tokens: 100}),
+  MyValidationSolver
+])
+
+# Execute the chain
+{:ok, result_state} = Chain.solve(chain, state, generate_fn)
+```
+
+#### No Breaking Changes
+Existing experiment definitions continue to work unchanged. The new modules are additive.
+
+### Upgrading to v0.3.0
 
 Version 0.3.0 introduces integration with the new `crucible_ir` library for shared IR structs. This change is mostly transparent to users.
 
-### What Changed
+#### What Changed
 - CrucibleHarness now depends on `crucible_ir` v0.1.1 for IR struct definitions
 - Updated to work with `crucible_framework` v0.5.0
 - Internal IR module references updated from `Crucible.IR.*` to `CrucibleIR.*`
 
-### Do I Need to Change My Code?
-**For most users: No.** The public API remains unchanged. Your experiment definitions will work exactly as before.
+#### Do I Need to Change My Code?
+**For most users: No.** The public API remains unchanged.
 
 **Only if you were directly using internal IR structs** (uncommon), update your imports:
 
@@ -432,7 +550,7 @@ alias Crucible.IR.{Experiment, BackendRef, StageDef}
 alias CrucibleIR.{Experiment, BackendRef, StageDef}
 ```
 
-### Dependencies
+#### Dependencies
 The new version automatically brings in:
 - `crucible_ir` v0.1.1 - Shared IR structs
 - `crucible_framework` v0.5.0 - Updated framework integration

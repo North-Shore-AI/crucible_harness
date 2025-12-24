@@ -2,6 +2,36 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.1] - 2025-12-23
+
+### Added
+- **inspect-ai Parity Modules:** Added execution orchestration patterns inspired by inspect-ai
+  - `CrucibleHarness.Solver` - Behaviour for composable execution steps
+  - `CrucibleHarness.Solver.Chain` - Sequential solver composition with early termination
+  - `CrucibleHarness.Solver.Generate` - Built-in solver for LLM generation
+  - `CrucibleHarness.TaskState` - State object threaded through solver pipelines
+  - `CrucibleHarness.Generate` - Behaviour for LLM backend implementations
+
+### Features
+- **Solver Composition:** Chain multiple solvers into sequential pipelines
+- **Early Termination:** Chains stop on errors or when `state.completed` is set
+- **Flexible Solver Types:** Support for both module-based and struct-based solvers
+- **State Threading:** TaskState carries messages, metadata, and inter-solver communication via store
+- **Backend Abstraction:** Generate behaviour allows swapping LLM backends (Tinkex, OpenAI, etc.)
+
+### Documentation
+- Added comprehensive inline documentation with examples for all new modules
+- Added design specification in `docs/20251223/INSPECT_AI_PARITY_SPEC.md`
+
+### Testing
+- Added 80+ new tests covering all solver functionality
+- 100% test pass rate with no compilation warnings
+
+### Technical Details
+- New modules follow inspect-ai's Solver/TaskState/Generate architecture
+- Compatible with existing CrucibleHarness experiment orchestration
+- No breaking changes to existing APIs
+
 ## [0.3.0] - 2025-11-26
 
 ### Changed

@@ -9,6 +9,8 @@ This guide provides detailed instructions for using ResearchHarness to run AI re
 3. [Running Experiments](#running-experiments)
 4. [Analyzing Results](#analyzing-results)
 5. [Best Practices](#best-practices)
+6. [Solver Pipelines](#solver-pipelines)
+
 
 ## Basic Workflow
 
@@ -453,3 +455,160 @@ File.mkdir_p!("./results")
 ## Support
 
 For issues or questions, refer to the main ResearchHarness documentation or reach out to the development team.
+
+## Solver Pipelines
+
+Version 0.3.1 introduced inspect-ai-inspired solver pipelines for composable LLM execution.
+
+### Core Concepts
+
+```elixir
+alias CrucibleHarness.{Solver, TaskState}
+alias CrucibleHarness.Solver.{Chain, Generate}
+```
+
+- **Solver** - A behaviour defining a single execution step
+- **Chain** - Composes multiple solvers into a sequential pipeline
+- **TaskState** - State threaded through the pipeline (messages, store, metadata)
+- **Generate** - Behaviour for LLM backends; Solver.Generate is a built-in solver
+
+### Creating a TaskState
+
+```elixir
+# From a simple string input
+sample = %{id: "sample_1", input: "What is the capital of France?"}
+state = TaskState.new(sample)
+
+# From a message list (for multi-turn conversations)
+sample = %{
+  id: "sample_2",
+  input: [
+    %{role: "system", content: "You are a geography expert."},
+    %{role: "user", content: "What is the capital of France?"}
+  ],
+  metadata: %{category: "geography"}
+}
+state = TaskState.new(sample)
+```
+
+### Implementing a Solver
+
+```elixir
+defmodule MyPromptSolver do
+  use CrucibleHarness.Solver
+
+  @impl true
+  def solve(state, _generate_fn) do
+    # Add a system message
+    new_state = TaskState.add_message(state, %{
+      role: "system",
+      content: "Answer concisely. Keep responses under 50 words."
+    })
+    {:ok, new_state}
+  end
+end
+```
+
+### Using the Generate Solver
+
+```elixir
+# Create a generate solver with LLM config
+solver = CrucibleHarness.Solver.Generate.new(%{
+  model: "gpt-4",
+  temperature: 0.7,
+  max_tokens: 100,
+  stop: []
+})
+
+# Provide a generate function (your LLM backend)
+generate_fn = fn state, config ->
+  # Call your LLM API here
+  {:ok, %{
+    content: "Paris is the capital of France.",
+    finish_reason: "stop",
+    usage: %{prompt_tokens: 15, completion_tokens: 8, total_tokens: 23}
+  }}
+end
+
+# Execute
+{:ok, result} = CrucibleHarness.Solver.Generate.solve(solver, state, generate_fn)
+```
+
+### Building Solver Chains
+
+```elixir
+# Combine solvers sequentially
+chain = Chain.new([
+  MyPromptSolver,
+  Generate.new(%{temperature: 0.7, max_tokens: 100}),
+  MyValidationSolver
+])
+
+# Execute the chain
+{:ok, final_state} = Chain.solve(chain, initial_state, generate_fn)
+
+# Chain stops early if:
+# - A solver returns {:error, reason}
+# - A solver sets state.completed = true
+```
+
+### Inter-Solver Communication
+
+Use the `store` field to pass data between solvers:
+
+```elixir
+defmodule StoringSolver do
+  use CrucibleHarness.Solver
+
+  @impl true
+  def solve(state, _generate_fn) do
+    # Write to store
+    new_store = Map.put(state.store, :my_data, %{computed: true})
+    {:ok, %{state | store: new_store}}
+  end
+end
+
+defmodule ReadingSolver do
+  use CrucibleHarness.Solver
+
+  @impl true
+  def solve(state, _generate_fn) do
+    # Read from store
+    case state.store[:my_data] do
+      %{computed: true} -> {:ok, state}
+      _ -> {:error, :missing_computation}
+    end
+  end
+end
+```
+
+### Implementing a Generate Backend
+
+```elixir
+defmodule TinkexBackend do
+  @behaviour CrucibleHarness.Generate
+
+  @impl true
+  def generate(messages, config) do
+    case Tinkex.Sampling.create_sample(
+      messages: messages,
+      model: config.model,
+      temperature: config.temperature,
+      max_tokens: config.max_tokens
+    ) do
+      {:ok, sample} ->
+        {:ok, %{
+          content: sample.content,
+          finish_reason: "stop",
+          usage: %{
+            prompt_tokens: sample.usage.prompt_tokens,
+            completion_tokens: sample.usage.completion_tokens,
+            total_tokens: sample.usage.total_tokens
+          }
+        }}
+
+      error -> error
+    end
+  end
+end
+```

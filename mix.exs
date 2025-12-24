@@ -1,7 +1,7 @@
 defmodule CrucibleHarness.MixProject do
   use Mix.Project
 
-  @version "0.3.0"
+  @version "0.3.1"
   @source_url "https://github.com/North-Shore-AI/crucible_harness"
 
   def project do
@@ -29,8 +29,8 @@ defmodule CrucibleHarness.MixProject do
   defp deps do
     [
       # Shared IR from Hex; framework via local path for development
-      {:crucible_ir, "~> 0.1.1"},
-      {:crucible_framework, path: "../crucible_framework"},
+      # {:crucible_ir, "~> 0.1.1"},
+      # {:crucible_framework, "~> 0.4.0"},
 
       # Core Dependencies
       {:gen_stage, "~> 1.2"},
