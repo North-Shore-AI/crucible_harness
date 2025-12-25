@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.2] - 2025-12-24
+
+### Added
+- **TaskState Parity:** Model/epoch/target/choices/scores/limits/tool metadata + `input_text`/`user_prompt` helpers
+- **Tool Calling Flow:** Generate solver supports `loop`, `single`, and `none` tool-call handling
+- **Tool Definitions:** `CrucibleHarness.Tool` for normalized tool specs and execution
+
+### Changed
+- Generate config docs now include `tools` and `tool_choice`
+- README/USAGE updated with tool-call examples and new TaskState fields
+
+### Testing
+- Added tests for TaskState helpers, choices, tool-call loop, and message-limit completion
+
 ## [0.3.1] - 2025-12-23
 
 ### Added

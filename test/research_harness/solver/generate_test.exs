@@ -160,6 +160,120 @@ defmodule CrucibleHarness.Solver.GenerateTest do
 
       {:ok, _result_state} = GenerateSolver.solve(solver, state, generate_fn)
     end
+
+    test "resolves tool calls in loop mode" do
+      tool =
+        CrucibleHarness.Tool.new(
+          name: "adder",
+          handler: fn %{"a" => a, "b" => b} -> {:ok, "#{a + b}"} end
+        )
+
+      state =
+        TaskState.new(%{id: "test_1", input: "add"})
+        |> TaskState.set_tools([tool])
+
+      solver = GenerateSolver.new(%{tool_calls: "loop"})
+
+      call_count = :counters.new(1, [])
+
+      generate_fn = fn _state, _config ->
+        :counters.add(call_count, 1, 1)
+
+        case :counters.get(call_count, 1) do
+          1 ->
+            {:ok,
+             %{
+               content: "",
+               finish_reason: "tool_calls",
+               usage: %{total_tokens: 5},
+               tool_calls: [%{name: "adder", arguments: %{"a" => 2, "b" => 3}}]
+             }}
+
+          2 ->
+            {:ok, %{content: "5", finish_reason: "stop", usage: %{total_tokens: 7}}}
+        end
+      end
+
+      {:ok, result_state} = GenerateSolver.solve(solver, state, generate_fn)
+
+      assert :counters.get(call_count, 1) == 2
+      assert Enum.at(result_state.messages, -1).content == "5"
+      assert result_state.output.content == "5"
+    end
+
+    test "resolves tool calls once in single mode" do
+      tool =
+        CrucibleHarness.Tool.new(
+          name: "echo",
+          handler: fn %{"value" => value} -> {:ok, value} end
+        )
+
+      state =
+        TaskState.new(%{id: "test_1", input: "echo"})
+        |> TaskState.set_tools([tool])
+
+      solver = GenerateSolver.new(%{tool_calls: "single"})
+
+      generate_fn = fn _state, _config ->
+        {:ok,
+         %{
+           content: "",
+           finish_reason: "tool_calls",
+           usage: %{total_tokens: 5},
+           tool_calls: [%{name: "echo", arguments: %{"value" => "hi"}}]
+         }}
+      end
+
+      {:ok, result_state} = GenerateSolver.solve(solver, state, generate_fn)
+
+      assert Enum.any?(result_state.messages, &(&1.role == "tool"))
+      assert result_state.output.finish_reason == "tool_calls"
+    end
+
+    test "ignores tool calls when disabled" do
+      tool =
+        CrucibleHarness.Tool.new(
+          name: "noop",
+          handler: fn _ -> {:ok, "ignored"} end
+        )
+
+      state =
+        TaskState.new(%{id: "test_1", input: "noop"})
+        |> TaskState.set_tools([tool])
+
+      solver = GenerateSolver.new(%{tool_calls: "none"})
+
+      generate_fn = fn _state, _config ->
+        {:ok,
+         %{
+           content: "done",
+           finish_reason: "stop",
+           usage: %{total_tokens: 5},
+           tool_calls: [%{name: "noop", arguments: %{}}]
+         }}
+      end
+
+      {:ok, result_state} = GenerateSolver.solve(solver, state, generate_fn)
+
+      refute Enum.any?(result_state.messages, &(&1.role == "tool"))
+      assert result_state.output.content == "done"
+    end
+
+    test "marks state completed when message limit is reached" do
+      state =
+        TaskState.new(%{id: "test_1", input: "Hello"}, message_limit: 2)
+
+      solver = GenerateSolver.new()
+
+      generate_fn = fn _state, _config ->
+        {:ok, %{content: "Hi", finish_reason: "stop", usage: %{total_tokens: 5}}}
+      end
+
+      {:ok, result_state} = GenerateSolver.solve(solver, state, generate_fn)
+
+      assert length(result_state.messages) == 2
+      assert result_state.completed
+    end
   end
 
   describe "GenerateSolver as a Solver" do

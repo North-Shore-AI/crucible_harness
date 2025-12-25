@@ -27,9 +27,9 @@ Think of it as **"pytest + MLflow + Weights & Biases"** for Elixir AI research.
 - **Lifecycle Hooks** (v0.2.0) - Extensible callbacks for setup, teardown, and custom error handling
 - **Error Recovery** (v0.2.0) - Automatic retry with exponential backoff and circuit breaker
 - **Metric Validation** (v0.2.0) - Runtime schema validation with type coercion
-- **Solver Pipelines** (v0.3.1) - Composable execution steps inspired by inspect-ai
-- **State Threading** (v0.3.1) - TaskState carries messages and metadata through solver chains
-- **LLM Backend Abstraction** (v0.3.1) - Swappable Generate backends for different LLM providers
+- **Solver Pipelines** (v0.3.2) - Composable execution steps inspired by inspect-ai
+- **State Threading** (v0.3.2) - TaskState carries messages, targets, and limits through solver chains
+- **LLM Backend Abstraction** (v0.3.2) - Swappable Generate backends with tool-call support
 
 ## Quick Start
 
@@ -253,7 +253,7 @@ Schema.positive_number()               # >= 0
 Schema.duration_ms()                   # Positive number in milliseconds
 ```
 
-### Solver Pipelines (v0.3.1)
+### Solver Pipelines (v0.3.2)
 
 Build composable LLM execution pipelines using inspect-ai-inspired patterns:
 
@@ -275,12 +275,27 @@ end
 # Create a solver chain
 chain = Chain.new([
   SystemPromptSolver,
-  Generate.new(%{model: "gpt-4", temperature: 0.7, max_tokens: 500, stop: []}),
+  Generate.new(%{
+    model: "gpt-4",
+    temperature: 0.7,
+    max_tokens: 500,
+    stop: [],
+    tool_calls: "loop"
+  }),
 ])
 
 # Initialize state from a sample
 sample = %{id: "sample_1", input: "Explain recursion briefly."}
-state = TaskState.new(sample)
+
+tool =
+  CrucibleHarness.Tool.new(
+    name: "adder",
+    handler: fn %{"a" => a, "b" => b} -> {:ok, a + b} end
+  )
+
+state =
+  TaskState.new(sample)
+  |> TaskState.set_tools([tool])
 
 # Define your LLM backend
 generate_fn = fn state, config ->
@@ -299,7 +314,7 @@ IO.puts(result.output.content)
 
 - **Solver** - A behaviour for execution steps (`solve/2` callback)
 - **Chain** - Composes solvers sequentially; stops on error or `state.completed`
-- **TaskState** - Carries messages, metadata, and inter-solver data via `store`
+- **TaskState** - Carries messages, targets, limits, and inter-solver data via `store`
 - **Generate** - Behaviour for LLM backends; `Solver.Generate` is a built-in solver
 
 **Implementing a Generate Backend:**
@@ -314,7 +329,8 @@ defmodule MyBackend do
     {:ok, %{
       content: "Response text",
       finish_reason: "stop",
-      usage: %{prompt_tokens: 10, completion_tokens: 20, total_tokens: 30}
+      usage: %{prompt_tokens: 10, completion_tokens: 20, total_tokens: 30},
+      tool_calls: []
     }}
   end
 end
@@ -389,11 +405,11 @@ CrucibleHarness
 ├── Validation (Metric Validation) [v0.2.0]
 │   ├── Schema (Schema definition helpers)
 │   └── MetricValidator (Runtime validation)
-├── Solver (Composable Execution Steps) [v0.3.1]
+├── Solver (Composable Execution Steps) [v0.3.2]
 │   ├── Chain (Sequential solver composition)
 │   └── Generate (Built-in LLM generation solver)
-├── TaskState (State Threading for Pipelines) [v0.3.1]
-├── Generate (LLM Backend Abstraction) [v0.3.1]
+├── TaskState (State Threading for Pipelines) [v0.3.2]
+├── Generate (LLM Backend Abstraction) [v0.3.2]
 └── Utilities (Cost/Time Estimation, Checkpointing)
 ```
 
@@ -471,7 +487,7 @@ Add `research_harness` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:crucible_harness, "~> 0.3.1"}
+    {:crucible_harness, "~> 0.3.2"}
   ]
 end
 ```
@@ -488,16 +504,14 @@ end
 
 ## Upgrading
 
-### Upgrading to v0.3.1
+### Upgrading to v0.3.2
 
-Version 0.3.1 adds inspect-ai parity modules for building composable LLM execution pipelines.
+Version 0.3.2 expands inspect-ai parity for TaskState and tool-calling generate flows.
 
-#### New Modules
-- `CrucibleHarness.Solver` - Behaviour for composable execution steps
-- `CrucibleHarness.Solver.Chain` - Sequential solver composition with early termination
-- `CrucibleHarness.Solver.Generate` - Built-in solver for LLM generation
-- `CrucibleHarness.TaskState` - State object threaded through solver pipelines
-- `CrucibleHarness.Generate` - Behaviour for LLM backend implementations
+#### New Additions
+- `CrucibleHarness.Tool` - Tool definitions and execution for tool-call flows
+- `CrucibleHarness.TaskState.Choices` - Multiple-choice helper struct
+- TaskState enhancements: model/epoch/targets/limits/tool metadata
 
 #### Quick Example
 
@@ -574,4 +588,3 @@ MIT License - see [LICENSE](https://github.com/North-Shore-AI/crucible_harness/b
 ## Acknowledgments
 
 Built for systematic AI research experimentation with a focus on ensemble methods, hedging strategies, and model comparisons.
-

@@ -39,6 +39,8 @@ defmodule CrucibleHarness.Generate do
     * `:temperature` - Sampling temperature (0.0 to 1.0+)
     * `:max_tokens` - Maximum tokens to generate
     * `:stop` - List of stop sequences
+    * `:tools` - Optional tool definitions for tool calling
+    * `:tool_choice` - Optional tool choice directive
 
   Additional fields can be included for backend-specific options.
 
@@ -49,6 +51,7 @@ defmodule CrucibleHarness.Generate do
     * `:content` - Generated text content
     * `:finish_reason` - Why generation stopped ("stop", "length", "error", etc.)
     * `:usage` - Map with token usage statistics
+    * `:tool_calls` - Optional list of tool call maps
 
   ## Usage with Solvers
 
@@ -120,10 +123,12 @@ defmodule CrucibleHarness.Generate do
   """
 
   @type config :: %{
-          required(:model) => String.t(),
-          required(:temperature) => float(),
-          required(:max_tokens) => pos_integer(),
-          required(:stop) => [String.t()],
+          optional(:model) => String.t(),
+          optional(:temperature) => float(),
+          optional(:max_tokens) => pos_integer(),
+          optional(:stop) => [String.t()],
+          optional(:tools) => [CrucibleHarness.Tool.t() | map()],
+          optional(:tool_choice) => term(),
           optional(atom()) => any()
         }
 
@@ -131,6 +136,7 @@ defmodule CrucibleHarness.Generate do
           required(:content) => String.t(),
           required(:finish_reason) => String.t(),
           required(:usage) => map(),
+          optional(:tool_calls) => [map()],
           optional(atom()) => any()
         }
 

@@ -15,6 +15,7 @@ defmodule CrucibleHarness.TaskStateTest do
       assert state.completed == false
       assert state.metadata == %{}
       assert state.store == %{}
+      assert state.epoch == 0
     end
 
     test "creates TaskState from sample with message list input" do
@@ -49,6 +50,95 @@ defmodule CrucibleHarness.TaskStateTest do
       state = TaskState.new(sample)
 
       assert state.metadata == %{}
+    end
+
+    test "accepts overrides for model, epoch, target, choices, and limits" do
+      sample = %{id: "sample_1", input: "test"}
+
+      state =
+        TaskState.new(sample,
+          model: "gpt-4",
+          epoch: 2,
+          target: "Paris",
+          choices: ["A", "B", "C"],
+          message_limit: 8,
+          token_limit: 100
+        )
+
+      assert state.model == "gpt-4"
+      assert state.epoch == 2
+      assert state.target == "Paris"
+      assert length(state.choices.items) == 3
+      assert state.message_limit == 8
+      assert state.token_limit == 100
+    end
+  end
+
+  describe "input_text/1" do
+    test "returns input when input is a string" do
+      state = TaskState.new(%{id: "sample_1", input: "Hello"})
+
+      assert TaskState.input_text(state) == "Hello"
+    end
+
+    test "returns last user message when input is a list" do
+      messages = [
+        %{role: "system", content: "System"},
+        %{role: "user", content: "First"},
+        %{role: "assistant", content: "Ack"},
+        %{role: "user", content: "Second"}
+      ]
+
+      state = TaskState.new(%{id: "sample_1", input: messages})
+
+      assert TaskState.input_text(state) == "Second"
+    end
+
+    test "raises when no user message exists" do
+      messages = [%{role: "system", content: "System"}]
+      state = TaskState.new(%{id: "sample_1", input: messages})
+
+      assert_raise ArgumentError, fn ->
+        TaskState.input_text(state)
+      end
+    end
+  end
+
+  describe "user_prompt/1" do
+    test "returns last user message" do
+      messages = [
+        %{role: "user", content: "First"},
+        %{role: "assistant", content: "Ack"},
+        %{role: "user", content: "Second"}
+      ]
+
+      state = TaskState.new(%{id: "sample_1", input: messages})
+
+      assert TaskState.user_prompt(state) == %{role: "user", content: "Second"}
+    end
+
+    test "raises when no user message exists" do
+      state = TaskState.new(%{id: "sample_1", input: [%{role: "system", content: "Sys"}]})
+
+      assert_raise ArgumentError, fn ->
+        TaskState.user_prompt(state)
+      end
+    end
+  end
+
+  describe "choices helper" do
+    test "wraps choices with original positions and supports mark/shuffle" do
+      choices = TaskState.Choices.new(["A", "B", "C"])
+
+      assert Enum.map(choices.items, & &1.value) == ["A", "B", "C"]
+      assert Enum.map(choices.items, & &1.original_position) == [0, 1, 2]
+
+      choices = TaskState.Choices.mark_choice(choices, 1, true)
+      assert Enum.at(choices.items, 1).correct == true
+
+      shuffled = TaskState.Choices.shuffle(choices, seed: 123)
+      assert Enum.map(shuffled.items, & &1.value) |> Enum.sort() == ["A", "B", "C"]
+      assert Enum.all?(shuffled.items, &is_integer(&1.original_position))
     end
   end
 

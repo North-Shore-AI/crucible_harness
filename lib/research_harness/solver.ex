@@ -67,7 +67,8 @@ defmodule CrucibleHarness.Solver do
   alias CrucibleHarness.TaskState
 
   @type generate_fn ::
-          (TaskState.t(), map() -> {:ok, map()} | {:error, term()})
+          (TaskState.t(), CrucibleHarness.Generate.config() ->
+             {:ok, CrucibleHarness.Generate.response()} | {:error, term()})
 
   @doc """
   Executes the solver on the given state.

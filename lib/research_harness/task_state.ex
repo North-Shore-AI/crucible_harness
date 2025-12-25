@@ -7,13 +7,22 @@ defmodule CrucibleHarness.TaskState do
 
   ## Fields
 
+    * `:model` - Model identifier for the run (string or nil)
     * `:sample_id` - Unique identifier for the sample (string or integer)
+    * `:epoch` - Epoch index for repeated evaluations
     * `:input` - Original input (string or list of messages)
     * `:messages` - List of conversation messages (maps with `:role` and `:content`)
+    * `:target` - Target output (string or list of strings)
+    * `:choices` - Multiple choice answers (CrucibleHarness.TaskState.Choices)
     * `:output` - Final output from generation (map or nil)
+    * `:message_limit` - Optional cap on total messages
+    * `:token_limit` - Optional cap on total tokens
     * `:completed` - Boolean flag indicating if processing is complete
     * `:metadata` - Additional metadata about the sample (map)
     * `:store` - Key-value store for inter-solver communication (map)
+    * `:scores` - Optional scoring results (map or nil)
+    * `:tools` - Available tools for tool calling
+    * `:tool_choice` - Tool choice directive
 
   ## Examples
 
@@ -42,23 +51,41 @@ defmodule CrucibleHarness.TaskState do
   """
 
   @type t :: %__MODULE__{
+          model: String.t() | nil,
           sample_id: String.t() | integer(),
+          epoch: non_neg_integer(),
           input: String.t() | [map()],
           messages: [map()],
+          target: String.t() | [String.t()],
+          choices: CrucibleHarness.TaskState.Choices.t() | nil,
           output: map() | nil,
+          message_limit: pos_integer() | nil,
+          token_limit: pos_integer() | nil,
           completed: boolean(),
           metadata: map(),
-          store: map()
+          store: map(),
+          scores: map() | nil,
+          tools: [CrucibleHarness.Tool.t()],
+          tool_choice: term()
         }
 
   defstruct [
+    :model,
     :sample_id,
+    :epoch,
     :input,
     messages: [],
+    target: "",
+    choices: nil,
     output: nil,
+    message_limit: nil,
+    token_limit: nil,
     completed: false,
     metadata: %{},
-    store: %{}
+    store: %{},
+    scores: nil,
+    tools: [],
+    tool_choice: nil
   ]
 
   @doc """
@@ -83,12 +110,31 @@ defmodule CrucibleHarness.TaskState do
       iex> state.metadata.type
       "chat"
   """
-  def new(sample) do
+  def new(sample, opts \\ []) do
+    model = Keyword.get(opts, :model, sample[:model])
+    epoch = Keyword.get(opts, :epoch, sample[:epoch] || 0)
+    target = Keyword.get(opts, :target, sample[:target] || "")
+    choices = Keyword.get(opts, :choices, sample[:choices] || [])
+    scores = Keyword.get(opts, :scores, sample[:scores])
+    message_limit = Keyword.get(opts, :message_limit, sample[:message_limit])
+    token_limit = Keyword.get(opts, :token_limit, sample[:token_limit])
+    tools = Keyword.get(opts, :tools, sample[:tools] || [])
+    tool_choice = Keyword.get(opts, :tool_choice, sample[:tool_choice])
+
     %__MODULE__{
+      model: model,
       sample_id: sample[:id],
+      epoch: epoch,
       input: sample[:input],
       messages: input_to_messages(sample[:input]),
-      metadata: sample[:metadata] || %{}
+      target: target,
+      choices: CrucibleHarness.TaskState.Choices.new(choices || []),
+      message_limit: message_limit,
+      token_limit: token_limit,
+      metadata: sample[:metadata] || %{},
+      scores: scores,
+      tools: CrucibleHarness.Tool.normalize_tools(tools),
+      tool_choice: tool_choice
     }
   end
 
@@ -148,6 +194,48 @@ defmodule CrucibleHarness.TaskState do
     %{state | output: output}
   end
 
+  @doc """
+  Returns the input text from the original sample input.
+
+  If the input is a list of messages, returns the last user message content.
+  """
+  @spec input_text(t()) :: String.t()
+  def input_text(%__MODULE__{input: input}) when is_binary(input), do: input
+
+  def input_text(%__MODULE__{input: input}) when is_list(input) do
+    case Enum.find(Enum.reverse(input), fn msg -> get_role(msg) == "user" end) do
+      nil -> raise ArgumentError, "input_text requested but no user message exists"
+      msg -> get_content(msg)
+    end
+  end
+
+  @doc """
+  Returns the last user message from the current message history.
+  """
+  @spec user_prompt(t()) :: map()
+  def user_prompt(%__MODULE__{messages: messages}) do
+    case Enum.find(Enum.reverse(messages), fn msg -> get_role(msg) == "user" end) do
+      nil -> raise ArgumentError, "user_prompt requested but no user message exists"
+      msg -> msg
+    end
+  end
+
+  @doc """
+  Sets available tools for tool calling.
+  """
+  @spec set_tools(t(), [CrucibleHarness.Tool.t() | map()]) :: t()
+  def set_tools(state, tools) do
+    %{state | tools: CrucibleHarness.Tool.normalize_tools(tools)}
+  end
+
+  @doc """
+  Sets the tool choice directive.
+  """
+  @spec set_tool_choice(t(), term()) :: t()
+  def set_tool_choice(state, tool_choice) do
+    %{state | tool_choice: tool_choice}
+  end
+
   # Private helpers
 
   defp input_to_messages(input) when is_binary(input) do
@@ -157,4 +245,12 @@ defmodule CrucibleHarness.TaskState do
   defp input_to_messages(messages) when is_list(messages) do
     messages
   end
+
+  defp get_role(%{role: role}), do: role
+  defp get_role(%{"role" => role}), do: role
+  defp get_role(_), do: nil
+
+  defp get_content(%{content: content}), do: content
+  defp get_content(%{"content" => content}), do: content
+  defp get_content(_), do: ""
 end

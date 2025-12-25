@@ -458,7 +458,7 @@ For issues or questions, refer to the main ResearchHarness documentation or reac
 
 ## Solver Pipelines
 
-Version 0.3.1 introduced inspect-ai-inspired solver pipelines for composable LLM execution.
+Version 0.3.2 introduced inspect-ai-inspired solver pipelines for composable LLM execution with tool calling support.
 
 ### Core Concepts
 
@@ -469,7 +469,8 @@ alias CrucibleHarness.Solver.{Chain, Generate}
 
 - **Solver** - A behaviour defining a single execution step
 - **Chain** - Composes multiple solvers into a sequential pipeline
-- **TaskState** - State threaded through the pipeline (messages, store, metadata)
+- **TaskState** - State threaded through the pipeline (messages, targets, limits, store)
+- **Tool** - Optional tool definitions for tool-call flows
 - **Generate** - Behaviour for LLM backends; Solver.Generate is a built-in solver
 
 ### Creating a TaskState
@@ -478,6 +479,10 @@ alias CrucibleHarness.Solver.{Chain, Generate}
 # From a simple string input
 sample = %{id: "sample_1", input: "What is the capital of France?"}
 state = TaskState.new(sample)
+
+# With targets and limits
+sample = %{id: "sample_3", input: "2+2?", target: "4"}
+state = TaskState.new(sample, message_limit: 6, token_limit: 200)
 
 # From a message list (for multi-turn conversations)
 sample = %{
@@ -517,17 +522,19 @@ solver = CrucibleHarness.Solver.Generate.new(%{
   model: "gpt-4",
   temperature: 0.7,
   max_tokens: 100,
-  stop: []
+  stop: [],
+  tool_calls: "loop"
 })
 
 # Provide a generate function (your LLM backend)
 generate_fn = fn state, config ->
   # Call your LLM API here
-  {:ok, %{
-    content: "Paris is the capital of France.",
-    finish_reason: "stop",
-    usage: %{prompt_tokens: 15, completion_tokens: 8, total_tokens: 23}
-  }}
+    {:ok, %{
+      content: "Paris is the capital of France.",
+      finish_reason: "stop",
+      usage: %{prompt_tokens: 15, completion_tokens: 8, total_tokens: 23},
+      tool_calls: []
+    }}
 end
 
 # Execute
@@ -604,7 +611,8 @@ defmodule TinkexBackend do
             prompt_tokens: sample.usage.prompt_tokens,
             completion_tokens: sample.usage.completion_tokens,
             total_tokens: sample.usage.total_tokens
-          }
+          },
+          tool_calls: []
         }}
 
       error -> error
