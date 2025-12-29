@@ -98,19 +98,7 @@ defmodule CrucibleHarness.Reporter.JupyterGenerator do
     else
       data =
         Enum.flat_map(results, fn result ->
-          Enum.flat_map(result.metrics, fn {metric, stats} ->
-            if stats.values do
-              Enum.map(stats.values, fn value ->
-                %{
-                  "condition" => result.condition,
-                  "metric" => to_string(metric),
-                  "value" => value
-                }
-              end)
-            else
-              []
-            end
-          end)
+          format_result_metrics(result)
         end)
 
       Jason.encode!(data)
@@ -173,5 +161,25 @@ defmodule CrucibleHarness.Reporter.JupyterGenerator do
                     t_stat, p_value = stats.ttest_ind(values1, values2)
                     print(f"{cond1} vs {cond2}: t={t_stat:.4f}, p={p_value:.4f}")
     """
+  end
+
+  defp format_result_metrics(result) do
+    Enum.flat_map(result.metrics, fn {metric, stats} ->
+      format_metric_values(result, metric, stats)
+    end)
+  end
+
+  defp format_metric_values(result, metric, stats) do
+    if stats.values do
+      Enum.map(stats.values, fn value ->
+        %{
+          "condition" => result.condition,
+          "metric" => to_string(metric),
+          "value" => value
+        }
+      end)
+    else
+      []
+    end
   end
 end

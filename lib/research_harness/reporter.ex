@@ -4,10 +4,10 @@ defmodule CrucibleHarness.Reporter do
   """
 
   alias CrucibleHarness.Reporter.{
-    MarkdownGenerator,
-    LaTeXGenerator,
     HTMLGenerator,
-    JupyterGenerator
+    JupyterGenerator,
+    LaTeXGenerator,
+    MarkdownGenerator
   }
 
   @doc """

@@ -58,7 +58,6 @@ defmodule CrucibleHarness.TaskState do
           messages: [map()],
           target: String.t() | [String.t()],
           choices: CrucibleHarness.TaskState.Choices.t() | nil,
-          output: map() | nil,
           message_limit: pos_integer() | nil,
           token_limit: pos_integer() | nil,
           completed: boolean(),
@@ -128,6 +127,7 @@ defmodule CrucibleHarness.TaskState do
       input: sample[:input],
       messages: input_to_messages(sample[:input]),
       target: target,
+      # credo:disable-for-next-line Credo.Check.Design.AliasUsage
       choices: CrucibleHarness.TaskState.Choices.new(choices || []),
       message_limit: message_limit,
       token_limit: token_limit,

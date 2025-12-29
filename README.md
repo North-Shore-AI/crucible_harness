@@ -27,9 +27,9 @@ Think of it as **"pytest + MLflow + Weights & Biases"** for Elixir AI research.
 - **Lifecycle Hooks** (v0.2.0) - Extensible callbacks for setup, teardown, and custom error handling
 - **Error Recovery** (v0.2.0) - Automatic retry with exponential backoff and circuit breaker
 - **Metric Validation** (v0.2.0) - Runtime schema validation with type coercion
-- **Solver Pipelines** (v0.3.2) - Composable execution steps inspired by inspect-ai
-- **State Threading** (v0.3.2) - TaskState carries messages, targets, and limits through solver chains
-- **LLM Backend Abstraction** (v0.3.2) - Swappable Generate backends with tool-call support
+- **Solver Pipelines** (v0.3.1) - Composable execution steps inspired by inspect-ai
+- **State Threading** (v0.3.1) - TaskState carries messages, targets, and limits through solver chains
+- **LLM Backend Abstraction** (v0.3.1) - Swappable Generate backends with tool-call support
 
 ## Quick Start
 
@@ -487,7 +487,7 @@ Add `research_harness` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:crucible_harness, "~> 0.3.2"}
+    {:crucible_harness, "~> 0.3.3"}
   ]
 end
 ```
@@ -503,6 +503,17 @@ end
 ```
 
 ## Upgrading
+
+### Upgrading to v0.3.3
+
+Version 0.3.3 updates telemetry dependency and cleans up dependency declarations.
+
+#### Changes
+- Updated `telemetry` from `~> 1.2` to `~> 1.3`
+- Removed commented-out dependency declarations
+
+#### No Breaking Changes
+All existing code continues to work unchanged.
 
 ### Upgrading to v0.3.2
 

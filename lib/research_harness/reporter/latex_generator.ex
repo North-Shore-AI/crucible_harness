@@ -59,22 +59,7 @@ defmodule CrucibleHarness.Reporter.LaTeXGenerator do
   end
 
   defp format_latex_results(results, metrics) do
-    Enum.map(results, fn result ->
-      metric_values =
-        Enum.map(metrics, fn metric ->
-          stats = result.metrics[metric]
-
-          if stats && stats.mean do
-            "& $#{Float.round(stats.mean, 3)} \\pm #{Float.round(stats.std || 0, 3)}$"
-          else
-            "& N/A"
-          end
-        end)
-        |> Enum.join(" ")
-
-      "#{escape_latex(result.condition)} #{metric_values} \\\\"
-    end)
-    |> Enum.join("\n")
+    Enum.map_join(results, "\n", &format_latex_result_row(&1, metrics))
   end
 
   defp comparison_table(analysis) do
@@ -104,20 +89,7 @@ defmodule CrucibleHarness.Reporter.LaTeXGenerator do
   end
 
   defp format_latex_comparisons(comparisons, metrics) do
-    Enum.map(comparisons, fn comp ->
-      {c1, c2} = comp.pair
-
-      metric_values =
-        Enum.map(metrics, fn metric ->
-          stats = comp.metrics[metric]
-          sig = if stats.significant, do: "^{*}", else: ""
-          "& $#{Float.round(stats.mean_diff, 3)}#{sig}$"
-        end)
-        |> Enum.join(" ")
-
-      "#{escape_latex(c1)} & #{escape_latex(c2)} #{metric_values} \\\\"
-    end)
-    |> Enum.join("\n")
+    Enum.map_join(comparisons, "\n", &format_latex_comparison_row(&1, metrics))
   end
 
   defp statistical_tests_table(analysis) do
@@ -147,7 +119,7 @@ defmodule CrucibleHarness.Reporter.LaTeXGenerator do
   end
 
   defp format_latex_stats(comparisons, metric) do
-    Enum.map(comparisons, fn comp ->
+    Enum.map_join(comparisons, "\n", fn comp ->
       {c1, c2} = comp.pair
       stats = comp.metrics[metric]
       sig = if stats.significant, do: "Yes", else: "No"
@@ -158,7 +130,6 @@ defmodule CrucibleHarness.Reporter.LaTeXGenerator do
         "#{sig} & " <>
         "$#{format_number_latex(stats.effect_size, 3)}$ \\\\"
     end)
-    |> Enum.join("\n")
   end
 
   defp document_end do
@@ -179,5 +150,33 @@ defmodule CrucibleHarness.Reporter.LaTeXGenerator do
     |> String.replace("&", "\\&")
     |> String.replace("#", "\\#")
     |> String.replace("$", "\\$")
+  end
+
+  defp format_latex_result_row(result, metrics) do
+    metric_values =
+      Enum.map_join(metrics, " ", fn metric ->
+        stats = result.metrics[metric]
+
+        if stats && stats.mean do
+          "& $#{Float.round(stats.mean, 3)} \\pm #{Float.round(stats.std || 0, 3)}$"
+        else
+          "& N/A"
+        end
+      end)
+
+    "#{escape_latex(result.condition)} #{metric_values} \\\\"
+  end
+
+  defp format_latex_comparison_row(comp, metrics) do
+    {c1, c2} = comp.pair
+
+    metric_values =
+      Enum.map_join(metrics, " ", fn metric ->
+        stats = comp.metrics[metric]
+        sig = if stats.significant, do: "^{*}", else: ""
+        "& $#{Float.round(stats.mean_diff, 3)}#{sig}$"
+      end)
+
+    "#{escape_latex(c1)} & #{escape_latex(c2)} #{metric_values} \\\\"
   end
 end

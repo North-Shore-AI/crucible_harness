@@ -69,10 +69,12 @@ defmodule CrucibleHarness.Experiment do
     end
   end
 
+  # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
   defmacro __before_compile__(_env) do
     quote do
+      # credo:disable-for-next-line Credo.Check.Refactor.CyclomaticComplexity
       def __config__ do
-        experiment_id = generate_experiment_id()
+        experiment_id = CrucibleHarness.Experiment.generate_experiment_id()
 
         %{
           experiment_id: experiment_id,
@@ -88,27 +90,30 @@ defmodule CrucibleHarness.Experiment do
           version: @experiment_version || "0.1.0",
           dataset_config: @dataset_config || %{},
           cost_budget: @cost_budget,
-          statistical_analysis: @statistical_analysis || default_statistical_analysis(),
+          statistical_analysis:
+            @statistical_analysis || CrucibleHarness.Experiment.default_statistical_analysis(),
           custom_metrics: @custom_metrics || [],
           metric_schemas: @metric_schemas || %{},
           hooks: CrucibleHarness.Experiment.collect_hooks(__MODULE__)
         }
       end
-
-      defp generate_experiment_id do
-        timestamp = DateTime.utc_now() |> DateTime.to_unix()
-        random = :rand.uniform(1_000_000)
-        "exp_#{timestamp}_#{random}"
-      end
-
-      defp default_statistical_analysis do
-        %{
-          significance_level: 0.05,
-          multiple_testing_correction: :bonferroni,
-          confidence_interval: 0.95
-        }
-      end
     end
+  end
+
+  @doc false
+  def generate_experiment_id do
+    timestamp = DateTime.utc_now() |> DateTime.to_unix()
+    random = :rand.uniform(1_000_000)
+    "exp_#{timestamp}_#{random}"
+  end
+
+  @doc false
+  def default_statistical_analysis do
+    %{
+      significance_level: 0.05,
+      multiple_testing_correction: :bonferroni,
+      confidence_interval: 0.95
+    }
   end
 
   @doc false

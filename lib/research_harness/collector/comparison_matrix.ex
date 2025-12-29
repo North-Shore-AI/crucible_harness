@@ -13,26 +13,24 @@ defmodule CrucibleHarness.Collector.ComparisonMatrix do
       for c1 <- conditions do
         row =
           for c2 <- conditions do
-            cond do
-              c1 == c2 ->
-                %{type: :self, value: nil}
+            if c1 == c2 do
+              %{type: :self, value: nil}
+            else
+              comp = find_comparison(analysis.comparisons, c1, c2)
 
-              true ->
-                comp = find_comparison(analysis.comparisons, c1, c2)
+              if comp do
+                metric_result = comp.metrics[metric]
 
-                if comp do
-                  metric_result = comp.metrics[metric]
-
-                  %{
-                    type: :comparison,
-                    mean_diff: metric_result.mean_diff,
-                    p_value: metric_result.p_value,
-                    significant: metric_result.significant,
-                    effect_size: metric_result.effect_size
-                  }
-                else
-                  %{type: :missing, value: nil}
-                end
+                %{
+                  type: :comparison,
+                  mean_diff: metric_result.mean_diff,
+                  p_value: metric_result.p_value,
+                  significant: metric_result.significant,
+                  effect_size: metric_result.effect_size
+                }
+              else
+                %{type: :missing, value: nil}
+              end
             end
           end
 

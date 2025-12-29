@@ -86,67 +86,73 @@ defmodule CrucibleHarness.Collector.StatisticalAnalyzer do
   defp t_test(values1, values2, analysis_config) do
     n1 = length(values1)
     n2 = length(values2)
-
     mean1 = mean(values1)
     mean2 = mean(values2)
-
     var1 = variance(values1)
     var2 = variance(values2)
 
-    # Handle case where variance is zero (all values are the same)
     if var1 == 0 and var2 == 0 do
-      # If both variances are zero, there's no variation to test
-      %{
-        t_statistic: if(mean1 == mean2, do: 0.0, else: :infinity),
-        p_value: if(mean1 == mean2, do: 1.0, else: 0.0),
-        df: n1 + n2 - 2,
-        mean_diff: mean1 - mean2,
-        ci_lower: mean1 - mean2,
-        ci_upper: mean1 - mean2,
-        significant: mean1 != mean2
-      }
+      t_test_zero_variance(mean1, mean2, n1, n2)
     else
-      # Welch's t-test (unequal variances)
-      pooled_std = :math.sqrt(var1 / n1 + var2 / n2)
+      t_test_welch(mean1, mean2, var1, var2, n1, n2, analysis_config)
+    end
+  end
 
-      t_statistic =
-        if pooled_std > 0 do
-          (mean1 - mean2) / pooled_std
-        else
-          if mean1 == mean2, do: 0.0, else: :infinity
-        end
+  defp t_test_zero_variance(mean1, mean2, n1, n2) do
+    %{
+      t_statistic: if(mean1 == mean2, do: 0.0, else: :infinity),
+      p_value: if(mean1 == mean2, do: 1.0, else: 0.0),
+      df: n1 + n2 - 2,
+      mean_diff: mean1 - mean2,
+      ci_lower: mean1 - mean2,
+      ci_upper: mean1 - mean2,
+      significant: mean1 != mean2
+    }
+  end
 
-      # Degrees of freedom (Welch-Satterthwaite)
-      df =
-        if var1 > 0 or var2 > 0 do
-          :math.pow(var1 / n1 + var2 / n2, 2) /
-            (:math.pow(var1 / n1, 2) / (n1 - 1) + :math.pow(var2 / n2, 2) / (n2 - 1))
-        else
-          n1 + n2 - 2
-        end
+  defp t_test_welch(mean1, mean2, var1, var2, n1, n2, analysis_config) do
+    pooled_std = :math.sqrt(var1 / n1 + var2 / n2)
+    t_statistic = calculate_t_statistic(mean1, mean2, pooled_std)
+    df = calculate_degrees_of_freedom(var1, var2, n1, n2)
+    p_value = calculate_p_value(t_statistic, mean1, mean2, df)
 
-      # Approximate p-value using t-distribution
-      p_value =
-        if is_number(t_statistic) and t_statistic != :infinity do
-          2 * (1 - t_cdf(abs(t_statistic), df))
-        else
-          if mean1 == mean2, do: 1.0, else: 0.0
-        end
+    ci_level = analysis_config.confidence_interval
+    t_critical = t_inverse(1 - (1 - ci_level) / 2, df)
+    margin = t_critical * pooled_std
 
-      # Confidence interval
-      ci_level = analysis_config.confidence_interval
-      t_critical = t_inverse(1 - (1 - ci_level) / 2, df)
-      margin = t_critical * pooled_std
+    %{
+      t_statistic: t_statistic,
+      p_value: p_value,
+      degrees_of_freedom: df,
+      mean_diff: mean1 - mean2,
+      ci_lower: mean1 - mean2 - margin,
+      ci_upper: mean1 - mean2 + margin,
+      significant: p_value < analysis_config.significance_level
+    }
+  end
 
-      %{
-        t_statistic: t_statistic,
-        p_value: p_value,
-        degrees_of_freedom: df,
-        mean_diff: mean1 - mean2,
-        ci_lower: mean1 - mean2 - margin,
-        ci_upper: mean1 - mean2 + margin,
-        significant: p_value < analysis_config.significance_level
-      }
+  defp calculate_t_statistic(mean1, mean2, pooled_std) do
+    if pooled_std > 0 do
+      (mean1 - mean2) / pooled_std
+    else
+      if mean1 == mean2, do: 0.0, else: :infinity
+    end
+  end
+
+  defp calculate_degrees_of_freedom(var1, var2, n1, n2) do
+    if var1 > 0 or var2 > 0 do
+      :math.pow(var1 / n1 + var2 / n2, 2) /
+        (:math.pow(var1 / n1, 2) / (n1 - 1) + :math.pow(var2 / n2, 2) / (n2 - 1))
+    else
+      n1 + n2 - 2
+    end
+  end
+
+  defp calculate_p_value(t_statistic, mean1, mean2, df) do
+    if is_number(t_statistic) and t_statistic != :infinity do
+      2 * (1 - t_cdf(abs(t_statistic), df))
+    else
+      if mean1 == mean2, do: 1.0, else: 0.0
     end
   end
 
@@ -247,6 +253,29 @@ defmodule CrucibleHarness.Collector.StatisticalAnalyzer do
     end
   end
 
+  defp rational_approximation(r) do
+    ((((0.3374754822 * r + 0.9761690190) * r + 0.1607979714) * r + 0.2765672646) * r +
+       1.5707963050) * r + 0.3193815032
+  end
+
+  defp central_approximation(r) do
+    (((-25.4410604963 * r + 41.3911977353) * r - 18.6150006252) * r + 2.5066282388) /
+      ((((3.1308290983 * r - 21.0622410182) * r + 23.0833674374) * r - 8.4735109309) * r +
+         1)
+  end
+
+  defp normal_inverse_tail(p, q) do
+    r = if q > 0, do: 1 - p, else: p
+    r = :math.log(-:math.log(r))
+    sign = if q > 0, do: 1, else: -1
+    sign * rational_approximation(r)
+  end
+
+  defp normal_inverse_central(q) do
+    r = q * q
+    q * central_approximation(r)
+  end
+
   defp normal_inverse(p) do
     # Approximation using Beasley-Springer-Moro algorithm (simplified)
     cond do
@@ -261,23 +290,7 @@ defmodule CrucibleHarness.Collector.StatisticalAnalyzer do
 
       true ->
         q = p - 0.5
-
-        if abs(q) <= 0.42 do
-          r = q * q
-
-          q *
-            ((((-25.4410604963 * r + 41.3911977353) * r - 18.6150006252) * r + 2.5066282388) /
-               ((((3.1308290983 * r - 21.0622410182) * r + 23.0833674374) * r - 8.4735109309) * r +
-                  1))
-        else
-          r = if q > 0, do: 1 - p, else: p
-          r = :math.log(-:math.log(r))
-          sign = if q > 0, do: 1, else: -1
-
-          sign *
-            (((((0.3374754822 * r + 0.9761690190) * r + 0.1607979714) * r + 0.2765672646) * r +
-                1.5707963050) * r + 0.3193815032)
-        end
+        if abs(q) <= 0.42, do: normal_inverse_central(q), else: normal_inverse_tail(p, q)
     end
   end
 end

@@ -105,32 +105,33 @@ defmodule CrucibleHarness.Solver.Chain do
 
   def solve(%__MODULE__{solvers: solvers}, state, generate_fn) do
     Enum.reduce_while(solvers, {:ok, state}, fn solver, {:ok, acc} ->
-      # Handle both module atoms and struct instances
-      result =
-        cond do
-          is_atom(solver) ->
-            # Module-based solver
-            solver.solve(acc, generate_fn)
+      execute_solver(solver, acc, generate_fn)
+    end)
+  end
 
-          is_struct(solver) ->
-            # Struct-based solver - get the module and call solve/3
-            solver.__struct__.solve(solver, acc, generate_fn)
+  defp execute_solver(solver, state, generate_fn) do
+    result =
+      cond do
+        is_atom(solver) ->
+          solver.solve(state, generate_fn)
 
-          true ->
-            {:error, {:invalid_solver, solver}}
+        is_struct(solver) ->
+          solver.__struct__.solve(solver, state, generate_fn)
+
+        true ->
+          {:error, {:invalid_solver, solver}}
+      end
+
+    case result do
+      {:ok, new_state} ->
+        if new_state.completed do
+          {:halt, {:ok, new_state}}
+        else
+          {:cont, {:ok, new_state}}
         end
 
-      case result do
-        {:ok, new_state} ->
-          if new_state.completed do
-            {:halt, {:ok, new_state}}
-          else
-            {:cont, {:ok, new_state}}
-          end
-
-        error ->
-          {:halt, error}
-      end
-    end)
+      error ->
+        {:halt, error}
+    end
   end
 end

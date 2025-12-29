@@ -42,7 +42,7 @@ defmodule CrucibleHarness.Experiment.Validator do
     conditions = config.conditions
 
     cond do
-      length(conditions) < 1 ->
+      conditions == [] ->
         {:error, "Experiment must have at least 1 condition"}
 
       not all_conditions_valid?(conditions) ->

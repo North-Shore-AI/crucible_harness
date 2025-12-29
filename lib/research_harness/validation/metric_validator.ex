@@ -23,23 +23,35 @@ defmodule CrucibleHarness.Validation.MetricValidator do
 
   defp validate_metrics(metrics, schemas, coerce_types, prefix) do
     Enum.reduce(schemas, {[], %{}}, fn {field, schema}, {errs, acc} ->
-      case Map.fetch(metrics, field) do
-        :error ->
-          if Map.get(schema, :required, true) do
-            {[error_entry(prefixed_field(field, prefix), :missing, nil) | errs], acc}
-          else
-            default = Map.get(schema, :default)
-            updated_acc = if is_nil(default), do: acc, else: Map.put(acc, field, default)
-            {errs, updated_acc}
-          end
-
-        {:ok, value} ->
-          {field_errors, validated_value} =
-            validate_value(field, value, schema, coerce_types, prefix)
-
-          {errs ++ field_errors, Map.put(acc, field, validated_value)}
-      end
+      validate_field(field, schema, metrics, coerce_types, prefix, {errs, acc})
     end)
+  end
+
+  defp validate_field(field, schema, metrics, coerce_types, prefix, {errs, acc}) do
+    case Map.fetch(metrics, field) do
+      :error ->
+        handle_missing_field(field, schema, prefix, {errs, acc})
+
+      {:ok, value} ->
+        handle_existing_field(field, value, schema, coerce_types, prefix, {errs, acc})
+    end
+  end
+
+  defp handle_missing_field(field, schema, prefix, {errs, acc}) do
+    if Map.get(schema, :required, true) do
+      {[error_entry(prefixed_field(field, prefix), :missing, nil) | errs], acc}
+    else
+      default = Map.get(schema, :default)
+      updated_acc = if is_nil(default), do: acc, else: Map.put(acc, field, default)
+      {errs, updated_acc}
+    end
+  end
+
+  defp handle_existing_field(field, value, schema, coerce_types, prefix, {errs, acc}) do
+    {field_errors, validated_value} =
+      validate_value(field, value, schema, coerce_types, prefix)
+
+    {errs ++ field_errors, Map.put(acc, field, validated_value)}
   end
 
   defp validate_value(field, value, %{type: :float} = schema, coerce_types, prefix) do

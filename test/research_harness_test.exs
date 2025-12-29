@@ -2,7 +2,11 @@ defmodule ResearchHarnessTest do
   use ExUnit.Case
   # doctest CrucibleHarness - Disabled: examples prompt for user input which hangs tests
 
+  alias CrucibleHarness.Collector.{MetricsAggregator, StatisticalAnalyzer}
   alias CrucibleHarness.Experiment
+  alias CrucibleHarness.Reporter.{HTMLGenerator, MarkdownGenerator}
+  alias CrucibleHarness.Runner
+  alias CrucibleHarness.Utilities.{CostEstimator, TimeEstimator}
 
   # Test experiment module
   defmodule SimpleExperiment do
@@ -91,7 +95,7 @@ defmodule ResearchHarnessTest do
   describe "cost estimation" do
     test "estimates experiment costs" do
       config = SimpleExperiment.__config__()
-      estimate = CrucibleHarness.Utilities.CostEstimator.estimate(config)
+      estimate = CostEstimator.estimate(config)
 
       assert is_number(estimate.total_cost)
       assert estimate.total_cost > 0
@@ -102,7 +106,7 @@ defmodule ResearchHarnessTest do
   describe "time estimation" do
     test "estimates experiment duration" do
       config = SimpleExperiment.__config__()
-      estimate = CrucibleHarness.Utilities.TimeEstimator.estimate(config)
+      estimate = TimeEstimator.estimate(config)
 
       assert is_number(estimate.estimated_duration)
       assert estimate.estimated_duration > 0
@@ -113,10 +117,10 @@ defmodule ResearchHarnessTest do
   describe "runner" do
     test "runs a simple experiment" do
       config = SimpleExperiment.__config__()
-      {:ok, results} = CrucibleHarness.Runner.run_experiment(config)
+      {:ok, results} = Runner.run_experiment(config)
 
       assert is_list(results)
-      assert length(results) > 0
+      assert results != []
 
       # Check first result has expected structure
       first = List.first(results)
@@ -128,7 +132,7 @@ defmodule ResearchHarnessTest do
 
     test "respects repeat count" do
       config = SimpleExperiment.__config__()
-      {:ok, results} = CrucibleHarness.Runner.run_experiment(config)
+      {:ok, results} = Runner.run_experiment(config)
 
       # Should have results for each condition * repeat * dataset_size
       # 2 conditions * 2 repeats * 100 samples (default) = 400
@@ -139,9 +143,9 @@ defmodule ResearchHarnessTest do
   describe "metrics aggregator" do
     test "aggregates results correctly" do
       config = SimpleExperiment.__config__()
-      {:ok, results} = CrucibleHarness.Runner.run_experiment(config)
+      {:ok, results} = Runner.run_experiment(config)
 
-      aggregated = CrucibleHarness.Collector.MetricsAggregator.aggregate(results, config)
+      aggregated = MetricsAggregator.aggregate(results, config)
 
       assert is_list(aggregated)
       # 2 conditions
@@ -159,10 +163,10 @@ defmodule ResearchHarnessTest do
   describe "statistical analyzer" do
     test "performs statistical analysis" do
       config = SimpleExperiment.__config__()
-      {:ok, results} = CrucibleHarness.Runner.run_experiment(config)
-      aggregated = CrucibleHarness.Collector.MetricsAggregator.aggregate(results, config)
+      {:ok, results} = Runner.run_experiment(config)
+      aggregated = MetricsAggregator.aggregate(results, config)
 
-      analysis = CrucibleHarness.Collector.StatisticalAnalyzer.analyze(aggregated, config)
+      analysis = StatisticalAnalyzer.analyze(aggregated, config)
 
       assert is_map(analysis)
       assert Map.has_key?(analysis, :comparisons)
@@ -174,9 +178,9 @@ defmodule ResearchHarnessTest do
   describe "reporter" do
     test "generates markdown report" do
       config = SimpleExperiment.__config__()
-      {:ok, results} = CrucibleHarness.Runner.run_experiment(config)
-      aggregated = CrucibleHarness.Collector.MetricsAggregator.aggregate(results, config)
-      analysis = CrucibleHarness.Collector.StatisticalAnalyzer.analyze(aggregated, config)
+      {:ok, results} = Runner.run_experiment(config)
+      aggregated = MetricsAggregator.aggregate(results, config)
+      analysis = StatisticalAnalyzer.analyze(aggregated, config)
 
       report_data = %{
         aggregated_results: aggregated,
@@ -184,7 +188,7 @@ defmodule ResearchHarnessTest do
         comparison_matrices: %{}
       }
 
-      markdown = CrucibleHarness.Reporter.MarkdownGenerator.generate(config, report_data)
+      markdown = MarkdownGenerator.generate(config, report_data)
 
       assert is_binary(markdown)
       assert String.contains?(markdown, config.name)
@@ -194,9 +198,9 @@ defmodule ResearchHarnessTest do
 
     test "generates HTML report" do
       config = SimpleExperiment.__config__()
-      {:ok, results} = CrucibleHarness.Runner.run_experiment(config)
-      aggregated = CrucibleHarness.Collector.MetricsAggregator.aggregate(results, config)
-      analysis = CrucibleHarness.Collector.StatisticalAnalyzer.analyze(aggregated, config)
+      {:ok, results} = Runner.run_experiment(config)
+      aggregated = MetricsAggregator.aggregate(results, config)
+      analysis = StatisticalAnalyzer.analyze(aggregated, config)
 
       report_data = %{
         aggregated_results: aggregated,
@@ -204,7 +208,7 @@ defmodule ResearchHarnessTest do
         comparison_matrices: %{}
       }
 
-      html = CrucibleHarness.Reporter.HTMLGenerator.generate(config, report_data)
+      html = HTMLGenerator.generate(config, report_data)
 
       assert is_binary(html)
       assert String.contains?(html, "<!DOCTYPE html>")

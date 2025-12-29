@@ -182,40 +182,7 @@ defmodule CrucibleHarness.Solver.Generate do
 
     case generate_fn.(state, config) do
       {:ok, response} ->
-        assistant_message =
-          %{role: "assistant", content: response.content}
-          |> maybe_put_tool_calls(response)
-
-        state =
-          state
-          |> TaskState.add_message(assistant_message)
-          |> TaskState.set_output(response)
-          |> maybe_mark_completed()
-
-        tool_calls = extract_tool_calls(response)
-
-        cond do
-          tool_calls_mode == :none ->
-            {:ok, state}
-
-          tool_calls == [] ->
-            {:ok, state}
-
-          state.completed ->
-            {:ok, state}
-
-          tool_calls_mode == :single ->
-            {:ok, apply_tool_calls(state, tool_calls)}
-
-          tool_calls_mode == :loop ->
-            state = apply_tool_calls(state, tool_calls)
-
-            if state.completed do
-              {:ok, state}
-            else
-              do_generate(state, generate_fn, config, tool_calls_mode, depth + 1)
-            end
-        end
+        handle_generation_success(response, state, generate_fn, config, tool_calls_mode, depth)
 
       error ->
         error
@@ -329,4 +296,37 @@ defmodule CrucibleHarness.Solver.Generate do
 
   defp maybe_put_model(config, %TaskState{model: nil}), do: config
   defp maybe_put_model(config, %TaskState{model: model}), do: Map.put_new(config, :model, model)
+
+  defp handle_generation_success(response, state, generate_fn, config, tool_calls_mode, depth) do
+    assistant_message =
+      %{role: "assistant", content: response.content}
+      |> maybe_put_tool_calls(response)
+
+    state =
+      state
+      |> TaskState.add_message(assistant_message)
+      |> TaskState.set_output(response)
+      |> maybe_mark_completed()
+
+    tool_calls = extract_tool_calls(response)
+    handle_tool_calls(state, tool_calls, tool_calls_mode, generate_fn, config, depth)
+  end
+
+  defp handle_tool_calls(state, _tool_calls, :none, _gn, _cfg, _d), do: {:ok, state}
+  defp handle_tool_calls(state, [], _mode, _gn, _cfg, _d), do: {:ok, state}
+  defp handle_tool_calls(%{completed: true} = state, _tc, _mode, _gn, _cfg, _d), do: {:ok, state}
+
+  defp handle_tool_calls(state, tool_calls, :single, _gn, _cfg, _d) do
+    {:ok, apply_tool_calls(state, tool_calls)}
+  end
+
+  defp handle_tool_calls(state, tool_calls, :loop, generate_fn, config, depth) do
+    state = apply_tool_calls(state, tool_calls)
+
+    if state.completed do
+      {:ok, state}
+    else
+      do_generate(state, generate_fn, config, :loop, depth + 1)
+    end
+  end
 end

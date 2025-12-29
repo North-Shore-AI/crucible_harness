@@ -48,7 +48,12 @@ defmodule CrucibleHarness do
   - Reproducibility via seed management
   """
 
-  alias CrucibleHarness.{Runner, Reporter, Utilities}
+  alias CrucibleHarness.Collector
+  alias CrucibleHarness.Collector.ComparisonMatrix
+  alias CrucibleHarness.Experiment
+  alias CrucibleHarness.Reporter
+  alias CrucibleHarness.Runner
+  alias CrucibleHarness.Utilities
 
   @doc """
   Runs an experiment and returns the results.
@@ -119,9 +124,8 @@ defmodule CrucibleHarness do
       IO.puts("Estimated time: \#{estimates.time.estimated_duration}ms")
   """
   def estimate(experiment_module) do
-    with {:ok, config} <- validate_experiment(experiment_module),
-         {:ok, estimates} <- estimate_cost_and_time(config, []) do
-      {:ok, estimates}
+    with {:ok, config} <- validate_experiment(experiment_module) do
+      estimate_cost_and_time(config, [])
     end
   end
 
@@ -147,7 +151,7 @@ defmodule CrucibleHarness do
   # Private Functions
 
   defp validate_experiment(experiment_module) do
-    CrucibleHarness.Experiment.Validator.validate(experiment_module)
+    Experiment.Validator.validate(experiment_module)
   end
 
   defp estimate_cost_and_time(config, opts) do
@@ -159,25 +163,36 @@ defmodule CrucibleHarness do
 
   defp confirm_execution(config, estimates, opts) do
     if opts[:dry_run] do
-      IO.puts("\n=== DRY RUN MODE ===")
-      print_estimates(config, estimates)
-      {:error, :dry_run}
+      handle_dry_run(config, estimates)
     else
-      if should_confirm?(opts) do
-        print_estimates(config, estimates)
-
-        case IO.gets("Proceed with experiment? (y/n): ") do
-          "y\n" -> :ok
-          _ -> {:error, :cancelled}
-        end
-      else
-        :ok
-      end
+      handle_confirmation(config, estimates, opts)
     end
   end
 
   defp should_confirm?(opts) do
     Keyword.get(opts, :confirm, true)
+  end
+
+  defp handle_dry_run(config, estimates) do
+    IO.puts("\n=== DRY RUN MODE ===")
+    print_estimates(config, estimates)
+    {:error, :dry_run}
+  end
+
+  defp handle_confirmation(config, estimates, opts) do
+    if should_confirm?(opts) do
+      print_estimates(config, estimates)
+      ask_for_confirmation()
+    else
+      :ok
+    end
+  end
+
+  defp ask_for_confirmation do
+    case IO.gets("Proceed with experiment? (y/n): ") do
+      "y\n" -> :ok
+      _ -> {:error, :cancelled}
+    end
   end
 
   defp print_estimates(config, estimates) do
@@ -220,7 +235,7 @@ defmodule CrucibleHarness do
 
   defp generate_comparison_matrices(analysis, config) do
     Enum.map(config.metrics, fn metric ->
-      {metric, CrucibleHarness.Collector.ComparisonMatrix.generate(analysis, metric)}
+      {metric, ComparisonMatrix.generate(analysis, metric)}
     end)
     |> Map.new()
   end

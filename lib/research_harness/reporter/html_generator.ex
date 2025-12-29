@@ -175,17 +175,15 @@ defmodule CrucibleHarness.Reporter.HTMLGenerator do
   end
 
   defp format_conditions_html(conditions) do
-    Enum.map(conditions, fn condition ->
+    Enum.map_join(conditions, "\n", fn condition ->
       "<li><strong>#{condition.name}</strong>: #{Map.get(condition, :description, "No description")}</li>"
     end)
-    |> Enum.join("\n")
   end
 
   defp format_metrics_html(metrics) do
-    Enum.map(metrics, fn metric ->
+    Enum.map_join(metrics, "\n", fn metric ->
       "<li>#{metric}</li>"
     end)
-    |> Enum.join("\n")
   end
 
   defp format_results_table_html(results) do
@@ -213,29 +211,14 @@ defmodule CrucibleHarness.Reporter.HTMLGenerator do
   end
 
   defp format_results_rows_html(results, metrics) do
-    Enum.map(results, fn result ->
-      metric_cells =
-        Enum.map(metrics, fn metric ->
-          stats = result.metrics[metric]
-
-          if stats && stats.mean do
-            "<td>#{Float.round(stats.mean, 3)} ± #{Float.round(stats.std || 0, 3)}</td>"
-          else
-            "<td>N/A</td>"
-          end
-        end)
-        |> Enum.join("")
-
-      "<tr><td><strong>#{result.condition}</strong></td><td>#{result.n}</td>#{metric_cells}</tr>"
-    end)
-    |> Enum.join("\n")
+    Enum.map_join(results, "\n", &format_result_row_html(&1, metrics))
   end
 
   defp format_comparisons_html(comparisons) do
     if Enum.empty?(comparisons) do
       "<p>No comparisons available (need at least 2 conditions).</p>"
     else
-      Enum.map(comparisons, fn comp ->
+      Enum.map_join(comparisons, "\n", fn comp ->
         {c1, c2} = comp.pair
 
         """
@@ -243,7 +226,6 @@ defmodule CrucibleHarness.Reporter.HTMLGenerator do
         #{format_comparison_table_html(comp.metrics)}
         """
       end)
-      |> Enum.join("\n")
     end
   end
 
@@ -268,7 +250,7 @@ defmodule CrucibleHarness.Reporter.HTMLGenerator do
   end
 
   defp format_comparison_rows_html(metrics) do
-    Enum.map(metrics, fn {metric, stats} ->
+    Enum.map_join(metrics, "\n", fn {metric, stats} ->
       sig_class = if stats.significant, do: "significant", else: "not-significant"
       sig_text = if stats.significant, do: "Yes", else: "No"
 
@@ -283,11 +265,25 @@ defmodule CrucibleHarness.Reporter.HTMLGenerator do
       </tr>
       """
     end)
-    |> Enum.join("\n")
   end
 
   defp format_number(:infinity), do: "∞"
   defp format_number(n) when is_float(n), do: Float.round(n, 4)
   defp format_number(n) when is_integer(n), do: n
   defp format_number(n), do: to_string(n)
+
+  defp format_result_row_html(result, metrics) do
+    metric_cells =
+      Enum.map_join(metrics, "", fn metric ->
+        stats = result.metrics[metric]
+
+        if stats && stats.mean do
+          "<td>#{Float.round(stats.mean, 3)} ± #{Float.round(stats.std || 0, 3)}</td>"
+        else
+          "<td>N/A"
+        end
+      end)
+
+    "<tr><td><strong>#{result.condition}</strong></td><td>#{result.n}</td>#{metric_cells}</tr>"
+  end
 end

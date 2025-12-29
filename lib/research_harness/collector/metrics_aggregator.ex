@@ -59,7 +59,7 @@ defmodule CrucibleHarness.Collector.MetricsAggregator do
     Map.get(result, metric_name)
   end
 
-  defp compute_metric_stats(values) when length(values) == 0 do
+  defp compute_metric_stats(values) when values == [] do
     %{
       mean: nil,
       std: nil,

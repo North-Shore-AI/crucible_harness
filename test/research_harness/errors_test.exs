@@ -1,7 +1,7 @@
 defmodule CrucibleHarness.ErrorsTest do
   use ExUnit.Case, async: true
 
-  alias CrucibleHarness.Errors.{Classifier, Retry, DLQ}
+  alias CrucibleHarness.Errors.{Classifier, DLQ, Retry}
 
   describe "error classifier" do
     test "identifies retryable errors" do

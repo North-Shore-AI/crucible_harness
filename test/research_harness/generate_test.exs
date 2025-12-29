@@ -244,8 +244,7 @@ defmodule CrucibleHarness.GenerateTest do
 
         defp estimate_tokens(messages) do
           messages
-          |> Enum.map(& &1.content)
-          |> Enum.join(" ")
+          |> Enum.map_join(" ", & &1.content)
           |> String.length()
           |> div(4)
         end
