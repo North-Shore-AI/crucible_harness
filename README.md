@@ -333,8 +333,42 @@ defmodule MyBackend do
       tool_calls: []
     }}
   end
-end
+      end
 ```
+
+### Jido.Plan Adapter (Optional)
+
+CrucibleHarness can interpret a `Jido.Plan` DAG as a solver chain for evaluation pipelines.
+This adapter is optional and does not add a hard dependency on `jido_action`. If you want
+to use it, add `{:jido_action, "..."}`
+to your application deps.
+
+```elixir
+alias CrucibleHarness.{PlanAdapter, Solver, TaskState}
+alias CrucibleHarness.Solver.Chain
+
+plan =
+  Jido.Plan.new()
+  |> Jido.Plan.add(:prepare, MyApp.Actions.Prepare)
+  |> Jido.Plan.add(:generate, MyApp.Actions.Generate, depends_on: :prepare)
+  |> Jido.Plan.add(:score, MyApp.Actions.Score, depends_on: :generate)
+
+step_runner = fn state, step, meta, generate_fn ->
+  # Use step.instruction + meta to execute your Jido Action
+  # and return {:ok, TaskState.t()} or {:error, term()}
+  MyPlanRunner.run_step(state, step.instruction, meta, generate_fn)
+end
+
+{:ok, chain} = PlanAdapter.to_solver_chain(plan, step_runner: step_runner)
+
+sample = %{id: "sample-1", input: "Explain recursion."}
+state = TaskState.new(sample)
+
+{:ok, result_state} = Chain.solve(chain, state, &MyBackend.generate/2)
+```
+
+The adapter forwards LineageIR dimensions (`trace_id`, `work_id`, `plan_id`, `step_id`)
+into step metadata so you can emit consistent telemetry inside your runner.
 
 ### Parameter Sweeps
 
@@ -419,6 +453,7 @@ See the `examples/` directory for complete examples:
 
 - `simple_comparison.ex` - Basic two-condition comparison
 - `ensemble_comparison.ex` - Multi-condition ensemble evaluation
+- `plan_pipeline.exs` - Jido.Plan adapter pipeline example
 
 ## API Reference
 

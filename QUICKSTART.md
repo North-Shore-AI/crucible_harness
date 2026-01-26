@@ -239,6 +239,25 @@ File.cp_r!("./results", "./archive/exp_#{Date.utc_today()}")
 4. **Document thoroughly**: Use the `description` field
 5. **Monitor progress**: Subscribe to progress updates for long experiments
 
+## Optional: Jido.Plan Pipelines
+
+If you already express evaluation pipelines as `Jido.Plan`, you can turn a plan
+into a solver chain and run it against samples:
+
+```elixir
+alias CrucibleHarness.{PlanAdapter, TaskState}
+alias CrucibleHarness.Solver.Chain
+
+{:ok, chain} =
+  PlanAdapter.to_solver_chain(plan,
+    step_runner: fn state, step, meta, generate_fn ->
+      MyPlanRunner.run_step(state, step.instruction, meta, generate_fn)
+    end
+  )
+
+{:ok, result_state} = Chain.solve(chain, TaskState.new(sample), &MyBackend.generate/2)
+```
+
 ## Examples
 
 Check out more examples:
@@ -311,4 +330,3 @@ See **USAGE.md** for full Solver Pipelines documentation.
 ---
 
 **Pro Tip**: Keep your experiments in version control alongside your code. This ensures reproducibility and makes it easy to track experimental changes over time.
-

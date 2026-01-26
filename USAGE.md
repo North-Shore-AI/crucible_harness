@@ -620,3 +620,24 @@ defmodule TinkexBackend do
   end
 end
 ```
+
+### Using Jido.Plan Pipelines
+
+`CrucibleHarness.PlanAdapter` converts a `Jido.Plan` DAG into a solver chain.
+This is optional and works best when your evaluation pipeline already lives in
+Jido actions.
+
+```elixir
+alias CrucibleHarness.{PlanAdapter, TaskState}
+alias CrucibleHarness.Solver.Chain
+
+{:ok, chain} =
+  PlanAdapter.to_solver_chain(plan,
+    step_runner: fn state, step, meta, generate_fn ->
+      MyPlanRunner.run_step(state, step.instruction, meta, generate_fn)
+    end,
+    lineage: %{trace_id: "trace-123", work_id: "work-456"}
+  )
+
+{:ok, result_state} = Chain.solve(chain, TaskState.new(sample), &MyBackend.generate/2)
+```
