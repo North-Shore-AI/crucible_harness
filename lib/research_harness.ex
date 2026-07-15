@@ -46,11 +46,36 @@ defmodule CrucibleHarness do
   - Multi-format reporting (Markdown, LaTeX, HTML, Jupyter)
   - Cost estimation and budget management
   - Reproducibility via seed management
+  - Hardware profile detection for edge/server tuning
+
+  ## Hardware Profiles
+
+  CrucibleHarness can detect GPU/VRAM capabilities and classify machines into profiles
+  for experiment tuning:
+
+      profile = CrucibleHarness.detect_hardware_profile()
+      # => :edge_standard (16GB VRAM)
+
+  Use the `before_experiment` hook to attach hardware info to experiment metadata:
+
+      defmodule MyExperiment do
+        use CrucibleHarness.Experiment
+
+        name "GPU-aware experiment"
+
+        before_experiment fn config ->
+          profile_info = CrucibleHarness.detect_hardware_profile_with_info()
+          {:ok, Map.put(config, :hardware_profile, profile_info)}
+        end
+
+        # ... rest of experiment definition
+      end
   """
 
   alias CrucibleHarness.Collector
   alias CrucibleHarness.Collector.ComparisonMatrix
   alias CrucibleHarness.Experiment
+  alias CrucibleHarness.Hardware
   alias CrucibleHarness.Reporter
   alias CrucibleHarness.Runner
   alias CrucibleHarness.Utilities
@@ -147,6 +172,60 @@ defmodule CrucibleHarness do
        %{experiment_id: experiment_id, results: results, analysis: analysis, reports: reports}}
     end
   end
+
+  # Hardware Profile Detection
+
+  @doc """
+  Detects the hardware profile of the current machine.
+
+  Returns a profile atom based on detected GPU/VRAM:
+  - `:edge_minimal` - 8GB VRAM
+  - `:edge_standard` - 16GB VRAM
+  - `:server_standard` - 24GB VRAM
+  - `:server_large` - 40GB+ VRAM
+  - `:cpu_only` - No GPU detected
+
+  ## Examples
+
+      :edge_standard = CrucibleHarness.detect_hardware_profile()
+      :cpu_only = CrucibleHarness.detect_hardware_profile()
+  """
+  @spec detect_hardware_profile() :: Hardware.Profile.profile()
+  defdelegate detect_hardware_profile(), to: Hardware.Profile, as: :detect
+
+  @doc """
+  Detects the hardware profile with full details.
+
+  Returns a map containing the profile, raw GPU info (if present),
+  and computed tuning parameters.
+
+  ## Examples
+
+      %{
+        profile: :edge_standard,
+        gpu: %{name: "NVIDIA GeForce RTX 4060 Ti", vram_mb: 16384},
+        timeout_multiplier: 1.5,
+        max_concurrency: 2
+      } = CrucibleHarness.detect_hardware_profile_with_info()
+  """
+  @spec detect_hardware_profile_with_info() :: Hardware.Profile.profile_info()
+  defdelegate detect_hardware_profile_with_info(), to: Hardware.Profile, as: :detect_with_info
+
+  @doc """
+  Detects GPU information.
+
+  Returns `{:ok, gpu_info}` with GPU name and VRAM in megabytes,
+  or `{:error, :no_gpu}` when no GPU is detected.
+
+  ## Examples
+
+      {:ok, %{name: "NVIDIA GeForce RTX 4060 Ti", vram_mb: 16384}} =
+        CrucibleHarness.detect_gpu()
+
+      {:error, :no_gpu} = CrucibleHarness.detect_gpu()
+  """
+  @spec detect_gpu() :: {:ok, Hardware.GPU.gpu_info()} | {:error, :no_gpu}
+  defdelegate detect_gpu(), to: Hardware.GPU, as: :detect
 
   # Private Functions
 
