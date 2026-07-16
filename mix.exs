@@ -29,15 +29,15 @@ defmodule CrucibleHarness.MixProject do
   defp deps do
     [
       # Core Dependencies
-      {:gen_stage, "~> 1.2"},
+      {:gen_stage, "~> 1.3"},
       {:flow, "~> 1.2"},
       {:jason, "~> 1.4"},
-      {:nimble_csv, "~> 1.2"},
-      {:statistex, "~> 1.0"},
-      {:telemetry, "~> 1.3"},
+      {:nimble_csv, "~> 1.3"},
+      {:statistex, "~> 1.1"},
+      {:telemetry, "~> 1.4"},
 
       # Development and Testing
-      {:ex_doc, "~> 0.40.0", only: :dev, runtime: false},
+      {:ex_doc, "~> 0.40.3", only: :dev, runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
